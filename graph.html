@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Graph Lab | Kindred</title>
+  <link rel="stylesheet" href="dsa-pages.css"><link rel="stylesheet" href="graph-overrides.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-page="graph">
+  <script src="google-map-config.js"></script><script src="dsa-pages.js" defer></script>
+  <div class="lab-shell">
+    <aside class="lab-side"><a class="lab-brand" href="index.html"><span class="mark">K</span><span>kindred.<small>DSA FIELD LAB</small></span></a><p>Six structures. Six ways to make Delhi respond faster.</p><nav><a href="array.html"><span>01</span>Array</a><a href="linked-list.html"><span>02</span>Linked list</a><a href="stack.html"><span>03</span>Stack</a><a href="queue.html"><span>04</span>Queue</a><a href="tree.html"><span>05</span>Tree</a><a class="active" href="graph.html"><span>06</span>Graph</a></nav><a class="back-link" href="index.html">← Back to command centre</a></aside>
+    <main class="lab-main"><header class="lab-top"><span class="crumb">DSA LAB / INTERACTIVE MODULE</span><span class="lab-status"><i></i>100 SAMPLE RECORDS</span></header>
+      <section class="lab-title"><div><span class="eyebrow" id="lab-kicker"></span><h1 id="lab-title"></h1></div><p id="lab-description"></p></section>
+      <div class="guide" id="why-how"></div>
+      <div class="workspace"><section class="sim-card graph-card"><h2>Emergency response network</h2><p class="sim-help">Select an emergency location. Dijkstra checks connected response stations and dispatches the nearest one.</p>
+        <div id="graph-map" class="graph-map"></div>
+        <div class="control-row"><select id="graph-place" class="input"><option>Chandni Chowk</option><option>India Gate</option><option>Saket</option><option>Dwarka Sector 10</option><option>Rohini Sector 18</option><option>Hauz Khas</option></select><button id="graph-run" class="action route-button">Find nearest response station</button></div>
+        <div class="checkpoint-filters"><span class="filter-heading">CHECKPOINT TYPES</span><label><input type="checkbox" class="station-filter" value="Police station" checked> Police stations</label><label><input type="checkbox" class="station-filter" value="Hospital" checked> Hospitals</label></div>
+        <div class="route-summary" id="route-summary">Choose an emergency location to begin traversal.</div>
+        <div class="graph-steps" id="graph-steps"></div>
+        <section class="distance-lab"><span class="eyebrow">DISTANCE-WEIGHTED GRAPH</span><h2>Every possible response route</h2><p>All lines begin at the emergency. Line length represents the estimated distance; the blue line is the shortest eligible route.</p><div id="distance-network" class="distance-network"></div><div class="distance-legend"><span><i class="legend-line"></i>candidate route</span><span><i class="legend-line shortest"></i>shortest route</span></div></section>
+      </section><aside class="info-card"><h2>Graph terms</h2><dl class="term-list"><dt>Vertex</dt><dd>A station or emergency location.</dd><dt>Edge</dt><dd>A connection between two vertices.</dd><dt>Weight</dt><dd>Distance between connected places.</dd><dt>Traversal</dt><dd>Visiting connected vertices.</dd><dt>Shortest path</dt><dd>The lowest-weight route to a station.</dd></dl><div class="complexity">Dijkstra <b id="complexity"></b></div></aside></div>
+    </main>
+  </div>
+</body>
+</html>
