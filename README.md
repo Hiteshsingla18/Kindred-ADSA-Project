@@ -1,16 +1,71 @@
 # Kindred City
 
-**A Smart City emergency-response dashboard and data-structures demo for New Delhi.**
+**A smart-city emergency-response dashboard and data-structures lab for New Delhi.**
 
-Kindred City combines a browser-based command centre with a small C++ server. Its sample data and routes are educational demonstrations—not a live dispatch system or turn-by-turn navigation service.
+Kindred City is an educational web application backed by a small C++17 server. It demonstrates priority-based emergency processing and shortest-path search alongside browser-based visualizations of common data structures. Its records and routes are simulated; it is not a live dispatch system or navigation service.
 
-## Features
+## At a glance
 
-- **Command centre:** view simulated emergencies, vehicles, and response stations.
-- **Priority queue:** process emergencies by priority, preserving arrival order for ties.
-- **Graph lab:** explore an illustrative weighted network and find the nearest eligible response station with Dijkstra's algorithm.
-- **DSA visualizations:** explore arrays, linked lists, stacks, queues, trees, and graphs.
-- **Delhi map:** view station coordinates on OpenStreetMap tiles, select a station for a straight-line preview, or optionally request browser location.
+- **Command centre:** sample emergency, vehicle, and response-station status.
+- **Priority queue:** process lower-numbered priorities first; equal-priority queue items retain FIFO order.
+- **Graph lab:** find the nearest eligible sample station with Dijkstra’s algorithm.
+- **DSA lab:** interactive array, linked-list, stack, queue, tree, and graph demonstrations.
+- **Delhi map:** Leaflet and OpenStreetMap tiles, station markers, straight-line previews, and opt-in browser location.
+
+## Screenshots
+
+| Command centre | OpenStreetMap station map |
+| --- | --- |
+| ![Kindred City command centre](docs/images/dashboard.png) | ![Delhi response stations on OpenStreetMap](docs/images/openstreetmap-map.png) |
+
+| Priority queue lab | Dijkstra graph route |
+| --- | --- |
+| ![Priority queue visualization](docs/images/priority-queue.png) | ![Dijkstra route result](docs/images/dijkstra-route.png) |
+
+| Decision-tree lab |
+| --- |
+| ![Emergency triage decision-tree visualization](docs/images/decision-tree.png) |
+
+## How the algorithms work
+
+### Emergency assignment
+
+The backend builds a min-heap from waiting emergencies, selects the highest-ranked request, and pairs it with a ready vehicle. Emergency ties use the emergency ID as a deterministic tie-breaker. If no request or vehicle is available, the API returns an error.
+
+```mermaid
+flowchart TD
+    A([Start]) --> B[Build min-heap of waiting emergencies]
+    B --> C{Waiting emergency available?}
+    C -- No --> D[Return no-waiting error]
+    C -- Yes --> E{Ready vehicle available?}
+    E -- No --> F[Return no-vehicle error]
+    E -- Yes --> G[Pop highest-ranked emergency]
+    G --> H[Mark emergency in progress]
+    H --> I[Mark vehicle on call]
+    I --> J([Return assignment])
+```
+
+### Nearest eligible station
+
+The graph endpoint runs Dijkstra’s algorithm over an illustrative, weighted, undirected graph. Edge weights are estimated distances, not live road or traffic data.
+
+```mermaid
+flowchart TD
+    A([Start at selected location]) --> B[Set start distance to zero]
+    B --> C{Candidate heap empty?}
+    C -- Yes --> D[Return no reachable station]
+    C -- No --> E[Pop candidate with smallest distance]
+    E --> F{Candidate is stale?}
+    F -- Yes --> C
+    F -- No --> G{Eligible station?}
+    G -- Yes --> H[Reconstruct path from predecessors]
+    H --> I([Return station, path, and distance])
+    G -- No --> J[Relax each neighboring edge]
+    J --> K{Any distance improved?}
+    K -- Yes --> L[Push improved candidate]
+    L --> C
+    K -- No --> C
+```
 
 ## Run locally
 
@@ -18,7 +73,7 @@ Kindred City combines a browser-based command centre with a small C++ server. It
 
 - Windows and PowerShell
 - MinGW-w64 with `g++` available on `PATH`
-- An internet connection for the dashboard's Leaflet library and OpenStreetMap map tiles
+- Internet access for the dashboard’s Leaflet library and OpenStreetMap tiles
 
 From the repository folder, run:
 
@@ -26,9 +81,9 @@ From the repository folder, run:
 .\start-localhost.ps1
 ```
 
-The script compiles `backend\main.cpp`, then serves the site at <http://localhost:8000>. Leave the PowerShell window open while using the site; press **Ctrl+C** to stop the server. No database or third-party C++ library is needed.
+The script compiles `backend\main.cpp` and serves the site at <http://localhost:8000>. Keep the PowerShell window open while using the app; press **Ctrl+C** to stop the server. No database or third-party C++ library is needed.
 
-To compile and start the server manually:
+To build and launch manually:
 
 ```powershell
 g++ -std=c++17 -static backend\main.cpp -lws2_32 -o backend\kindred-server.exe
@@ -37,9 +92,9 @@ g++ -std=c++17 -static backend\main.cpp -lws2_32 -o backend\kindred-server.exe
 
 ## Pages
 
-| Page | What it demonstrates |
+| Page | Demonstration |
 | --- | --- |
-| [Command centre](./index.html) | Emergency dashboard, station map, and live-location prompt |
+| [Command centre](./index.html) | Emergency dashboard, station map, and optional live-location request |
 | [Array](./array.html) | Indexed traffic readings |
 | [Linked list](./linked-list.html) | Vehicle nodes and links |
 | [Stack](./stack.html) | Route history and last-in, first-out operations |
@@ -47,44 +102,45 @@ g++ -std=c++17 -static backend\main.cpp -lws2_32 -o backend\kindred-server.exe
 | [Tree](./tree.html) | Emergency triage decisions |
 | [Graph](./graph.html) | Weighted network traversal and Dijkstra routing |
 
-The dashboard, queue, and graph operations use the C++ backend. The other DSA pages are browser-side visual demonstrations.
+The dashboard, queue, emergency assignment, and graph operations use the C++ backend. Array, linked-list, stack, and tree pages are browser-side demonstrations.
+
+## Backend API
+
+The local server listens on `127.0.0.1:8000`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Check server health |
+| `GET` | `/api/dashboard?limit=8` | Get dashboard counts and emergency records |
+| `POST` | `/api/emergencies/next` | Assign the next waiting emergency and a ready vehicle |
+| `GET` | `/api/queue` | Read the priority queue |
+| `POST` | `/api/queue/add?place=Saket&priority=1` | Add a queue item |
+| `POST` | `/api/queue/next` | Process the highest-priority queue item |
+| `GET` | `/api/route?location=Saket&type=all` | Find the nearest eligible station with Dijkstra’s algorithm |
+
+Sample data is held in memory and resets when the server restarts.
+
+## Map and location
+
+The dashboard map uses **Leaflet** with **OpenStreetMap** street tiles. It requires internet access to load the library and tiles, displays OpenStreetMap attribution, and needs no Google Maps API key. Selecting a station previews a straight line from Connaught Place; browser geolocation is requested only after pressing **Use my live location**. If the device is more than 25 km from Delhi, the page reports its coordinates and distance while keeping the map centered on Delhi.
+
+The Graph lab’s optional satellite layer is separate from the dashboard map and uses the Google Maps JavaScript API. To enable it, configure the API and billing, restrict a key to `http://localhost:8000/*`, and copy `google-map-config.example.js` to `google-map-config.js` with the key. The Graph lab does not use Google Directions or Routes APIs.
 
 ## Project structure
 
 | Path | Purpose |
 | --- | --- |
 | `backend/main.cpp` | C++ server, sample data, heap, and graph algorithms |
-| `index.html`, `app.js`, `api.js` | Dashboard page and backend requests |
-| `array.html`, `linked-list.html`, `stack.html` | DSA demonstrations |
-| `queue.html`, `tree.html`, `graph.html` | DSA demonstrations |
+| `index.html`, `app.js`, `api.js` | Dashboard and backend requests |
+| `array.html`, `linked-list.html`, `stack.html` | Browser-side DSA demonstrations |
+| `queue.html`, `tree.html`, `graph.html` | Queue, triage, and graph labs |
 | `dsa-pages.js` | DSA page behavior and visualizations |
 | `start-localhost.ps1` | Windows build-and-run script |
-
-## Backend API
-
-The local server listens on `127.0.0.1:8000` and provides:
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/health` | Check server health |
-| `GET` | `/api/dashboard?limit=8` | Get dashboard counts and emergency records |
-| `POST` | `/api/emergencies/next` | Assign the next waiting emergency |
-| `GET` | `/api/queue` | Read the priority queue |
-| `POST` | `/api/queue/add?place=Saket&priority=1` | Add an item to the queue |
-| `POST` | `/api/queue/next` | Process the highest-priority queue item |
-| `GET` | `/api/route?location=Saket&type=all` | Find a response station using Dijkstra's algorithm |
-
-Sample data is held in memory and resets when the server restarts.
-
-## Map and location
-
-The dashboard uses **Leaflet** with **OpenStreetMap** street tiles. It needs internet access to load the map library and tiles, but no map API key. OpenStreetMap attribution is visible on the map. Selecting a station previews a straight line from Connaught Place; browser GPS is requested only after pressing **Use my live location**. If the device is more than 25 km from Delhi, the page reports its coordinates and distance while keeping the map focused on Delhi.
-
-The Graph lab can optionally display Google satellite imagery. To enable it, configure the Google Maps JavaScript API and billing, restrict a key to `http://localhost:8000/*`, and copy `google-map-config.example.js` to `google-map-config.js` with the key. The Graph lab does not use Google Directions or Routes APIs.
+| `docs/images/` | README screenshots |
 
 ## Scope and limitations
 
 - Emergency, vehicle, and station data are simulated; no real emergency services are contacted.
-- The Graph lab uses illustrative road connections and estimated distances, not live road or traffic data.
-- The dashboard map's line is a straight-line coordinate preview, not a driving route.
+- The graph uses illustrative connections and estimated distances, not live road or traffic data.
+- The dashboard map’s line is a straight-line coordinate preview, not a driving route.
 - The displayed average response time is illustrative.
