@@ -75,56 +75,9 @@ const roadConnections = [
   ["West Delhi Junction", "Deen Dayal Upadhyay Hospital"],
   ["East Delhi Junction", "GTB Hospital"]
 ];
-let emergencyQueue = null;
-let queueArrival = 0;
+let queueItems = [];
+let queueBusy = false;
 let graphRunId = 0;
-
-class MinHeap {
-  constructor(compare) {
-    this.items = [];
-    this.compare = compare;
-  }
-
-  get size() {
-    return this.items.length;
-  }
-
-  push(item) {
-    this.items.push(item);
-    let index = this.items.length - 1;
-    while (index > 0) {
-      const parent = Math.floor((index - 1) / 2);
-      if (this.compare(this.items[index], this.items[parent]) >= 0) break;
-      [this.items[index], this.items[parent]] = [this.items[parent], this.items[index]];
-      index = parent;
-    }
-  }
-
-  pop() {
-    if (!this.items.length) return undefined;
-    const first = this.items[0];
-    const last = this.items.pop();
-    if (this.items.length) {
-      this.items[0] = last;
-      let index = 0;
-      while (true) {
-        const left = index * 2 + 1;
-        const right = left + 1;
-        let smallest = index;
-        if (left < this.items.length && this.compare(this.items[left], this.items[smallest]) < 0) smallest = left;
-        if (right < this.items.length && this.compare(this.items[right], this.items[smallest]) < 0) smallest = right;
-        if (smallest === index) break;
-        [this.items[index], this.items[smallest]] = [this.items[smallest], this.items[index]];
-        index = smallest;
-      }
-    }
-    return first;
-  }
-
-  toArray() {
-    return [...this.items];
-  }
-}
 
 function coordinatesFor(name) {
   if (emergencyLocations[name]) return emergencyLocations[name];
@@ -133,67 +86,12 @@ function coordinatesFor(name) {
   return station ? [station.lat, station.lng] : null;
 }
 
-function estimatedDistanceKm(from, to) {
-  const fromCoordinates = coordinatesFor(from);
-  const toCoordinates = coordinatesFor(to);
-  if (!fromCoordinates || !toCoordinates) throw new Error(`Unknown road-network location: ${!fromCoordinates ? from : to}`);
-  return Math.hypot((fromCoordinates[0] - toCoordinates[0]) * 111, (fromCoordinates[1] - toCoordinates[1]) * 103);
-}
-
-function createRoadGraph() {
-  const graph = new Map();
-  [...Object.keys(emergencyLocations), ...Object.keys(roadJunctions), ...Object.keys(responseStations)].forEach((name) => graph.set(name, []));
-  roadConnections.forEach(([from, to]) => {
-    const distance = estimatedDistanceKm(from, to);
-    graph.get(from).push({ to, distance });
-    graph.get(to).push({ to: from, distance });
-  });
-  return graph;
-}
-
-const roadGraph = createRoadGraph();
-
-function findNearestStation(start, targetNames) {
-  const targets = new Set(targetNames);
-  const distances = new Map([...roadGraph.keys()].map((name) => [name, Infinity]));
-  const previous = new Map();
-  const settled = [];
-  const pending = new MinHeap((a, b) => a.distance - b.distance || a.name.localeCompare(b.name));
-  distances.set(start, 0);
-  pending.push({ name: start, distance: 0 });
-
-  while (pending.size) {
-    const current = pending.pop();
-    if (current.distance !== distances.get(current.name)) continue;
-    settled.push(current);
-    if (targets.has(current.name)) {
-      const path = [];
-      for (let name = current.name; name; name = previous.get(name)) path.unshift(name);
-      return { station: current.name, distance: current.distance, path, settled };
-    }
-    for (const edge of roadGraph.get(current.name) || []) {
-      const candidate = current.distance + edge.distance;
-      if (candidate < distances.get(edge.to)) {
-        distances.set(edge.to, candidate);
-        previous.set(edge.to, current.name);
-        pending.push({ name: edge.to, distance: candidate });
-      }
-    }
-  }
-  return { station: null, distance: Infinity, path: [], settled };
-}
-
 function renderBase() {
   const output = document.querySelector("#output");
   if (page === "array") renderArray([12, 8, 15, 6, 11, 9, 18, 7, 14, 10, 5, 13]);
   if (page === "linked") renderLinked(["VH-014 · Ambulance", "VH-038 · Fire truck", "VH-061 · Patrol car", "VH-087 · Ambulance"]);
   if (page === "stack") renderStack(["India Gate → Saket", "CP → Lajpat Nagar", "Dwarka → Rohini"]);
-  if (page === "queue") {
-    emergencyQueue = new MinHeap((a, b) => a.priority - b.priority || a.order - b.order);
-    queueArrival = 0;
-    [{ place: "India Gate", priority: 1 }, { place: "Connaught Place", priority: 1 }, { place: "Saket", priority: 2 }, { place: "Dwarka", priority: 3 }].forEach((item) => emergencyQueue.push({ ...item, order: queueArrival++ }));
-    renderQueue(emergencyQueue.toArray());
-  }
+  if (page === "queue") renderQueue([], "Loading the C++ priority queue…");
   if (page === "tree") renderTree("Medical emergency", "Critical", "Ambulance + trauma team", "P1");
   if (page === "graph") renderRoute([]);
 }
@@ -244,53 +142,57 @@ function renderDistanceNetwork(location, path = []) {
   const source = `<g class="emergency-node" transform="translate(${sourcePosition.x} ${sourcePosition.y})"><circle r="3.5"></circle></g>`;
   target.innerHTML = `<svg viewBox="0 0 100 100" role="img" aria-label="Illustrative weighted road graph with Dijkstra route">${lines}${markers}${source}</svg>`;
 }
-function runEmergencyTraversal(location) {
+async function runEmergencyTraversal(location) {
   const summary = document.querySelector("#route-summary");
   const steps = document.querySelector("#graph-steps");
-  const eligibleStations = visibleResponseStations();
+  const selectedTypes = selectedStationTypes();
   const runId = ++graphRunId;
-  if (!eligibleStations.length) {
+  if (!selectedTypes.length) {
     summary.innerHTML = "<strong>Select at least one checkpoint type.</strong><span class=\"route-stat\">Choose Police stations or Hospitals before starting traversal.</span>";
     return;
   }
-  const result = findNearestStation(location, eligibleStations.map(([name]) => name));
-  if (!result.station) {
-    summary.innerHTML = "<strong>No eligible station is reachable.</strong><span class=\"route-stat\">Check the road connections and selected checkpoint types.</span>";
-    return;
-  }
-  const station = responseStations[result.station];
-  if (window.kindredGraphMap) {
-    const [lat, lng] = emergencyLocations[location];
-    if (window.kindredGraphEmergencyMarker) window.kindredGraphEmergencyMarker.setMap(null);
-    const emergencyMarker = new google.maps.Marker({ position: { lat, lng }, map: window.kindredGraphMap, title: `Emergency: ${location}`, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#e87862", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } });
-    window.kindredGraphMap.panTo({ lat, lng });
-    window.kindredGraphEmergencyMarker = emergencyMarker;
-    if (window.kindredGraphRoute) window.kindredGraphRoute.setMap(null);
-    window.kindredGraphRoute = new google.maps.Polyline({
-      path: result.path.map((name) => {
-        const [routeLat, routeLng] = coordinatesFor(name);
-        return { lat: routeLat, lng: routeLng };
-      }),
-      map: window.kindredGraphMap,
-      strokeColor: "#1769ff",
-      strokeOpacity: 0.9,
-      strokeWeight: 5
-    });
-  } else {
-    renderGraphGps([], location);
-  }
-  renderDistanceNetwork(location, result.path);
-  steps.innerHTML = result.settled.map((item, index) => `<div class="graph-step" data-step="${index}"><span>${index + 1}</span>Settled ${item.name}<small>${item.distance.toFixed(1)} km estimated from ${location}</small></div>`).join("");
-  summary.innerHTML = "Dijkstra is comparing the lowest known distance at each connected place…";
-  result.settled.forEach((item, index) => setTimeout(() => {
+  summary.textContent = "Asking the C++ backend to search the road network…";
+  try {
+    const type = selectedTypes.length === 2 ? "all" : selectedTypes[0];
+    const query = new URLSearchParams({ location, type });
+    const result = await window.kindredApi(`/api/route?${query}`);
     if (runId !== graphRunId) return;
-    const step = document.querySelector(`[data-step="${index}"]`);
-    if (step) step.classList.add("visited");
-    if (index === result.settled.length - 1) {
-      if (step) step.classList.add("selected");
-      summary.innerHTML = `<strong>Request sent to nearest eligible station</strong><span class="route-stat">${result.path.join(" → ")}</span><span class="route-stat">${station.type} · ${result.distance.toFixed(1)} km estimated graph distance</span>`;
+
+    if (window.kindredGraphMap) {
+      const [lat, lng] = emergencyLocations[location];
+      if (window.kindredGraphEmergencyMarker) window.kindredGraphEmergencyMarker.setMap(null);
+      window.kindredGraphEmergencyMarker = new google.maps.Marker({ position: { lat, lng }, map: window.kindredGraphMap, title: `Emergency: ${location}`, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#e87862", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } });
+      window.kindredGraphMap.panTo({ lat, lng });
+      if (window.kindredGraphRoute) window.kindredGraphRoute.setMap(null);
+      window.kindredGraphRoute = new google.maps.Polyline({
+        path: result.path.map((name) => {
+          const [routeLat, routeLng] = coordinatesFor(name);
+          return { lat: routeLat, lng: routeLng };
+        }),
+        map: window.kindredGraphMap,
+        strokeColor: "#1769ff",
+        strokeOpacity: 0.9,
+        strokeWeight: 5
+      });
+    } else {
+      renderGraphGps([], location);
     }
-  }, index * 600));
+
+    renderDistanceNetwork(location, result.path);
+    steps.innerHTML = result.settled.map((item, index) => `<div class="graph-step" data-step="${index}"><span>${index + 1}</span>Settled ${item.name}<small>${item.distance.toFixed(1)} km estimated from ${location}</small></div>`).join("");
+    summary.textContent = "C++ Dijkstra is comparing the lowest known distance at each connected place…";
+    result.settled.forEach((item, index) => setTimeout(() => {
+      if (runId !== graphRunId) return;
+      const step = document.querySelector(`[data-step="${index}"]`);
+      if (step) step.classList.add("visited");
+      if (index === result.settled.length - 1) {
+        if (step) step.classList.add("selected");
+        summary.innerHTML = `<strong>Request sent to nearest eligible station</strong><span class="route-stat">${result.path.join(" → ")}</span><span class="route-stat">${result.stationType} · ${result.distance.toFixed(1)} km estimated graph distance</span>`;
+      }
+    }, index * 600));
+  } catch (error) {
+    if (runId === graphRunId) summary.textContent = `C++ route request failed: ${error.message}`;
+  }
 }
 function setupGoogleGraphMap() {
   const target = document.querySelector("#graph-map");
@@ -324,9 +226,44 @@ function renderStack(items) {
   const top = items[items.length - 1];
   document.querySelector("#output").innerHTML = `<div class="stack-cells">${items.map((item, i) => `<span class="cell ${i === items.length - 1 ? "active" : ""}">${item}${i === items.length - 1 ? " · TOP" : ""}</span>`).reverse().join("")}</div><div class="log">TOP → ${top || "empty"} · POP removes the top item first · bottom stays until it reaches the top</div>`;
 }
-function renderQueue(items) {
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+function renderQueue(items, message = "") {
   const root = items[0];
-  document.querySelector("#output").innerHTML = `<div class="queue-cells">${items.map((item, index) => `<span class="cell ${index === 0 ? "active" : ""}"><small>index ${index}</small>P${item.priority} · ${item.place}</span>`).join("")}</div><div class="log">heap array · root → ${root ? `P${root.priority} at ${root.place}` : "empty"} · parents have higher priority than their children · equal priorities use arrival order</div>`;
+  const cells = items.map((item, index) => `<span class="cell ${index === 0 ? "active" : ""}"><small>index ${index}</small>P${item.priority} · ${escapeHtml(item.place)}</span>`).join("");
+  const status = message ? `${escapeHtml(message)} · ` : "";
+  document.querySelector("#output").innerHTML = `<div class="queue-cells">${cells}</div><div class="log">${status}heap array · root → ${root ? `P${root.priority} at ${escapeHtml(root.place)}` : "empty"} · parents have higher priority than their children · equal priorities use arrival order</div>`;
+}
+async function refreshQueue() {
+  try {
+    const data = await window.kindredApi("/api/queue");
+    queueItems = data.items;
+    renderQueue(queueItems);
+  } catch (error) {
+    renderQueue(queueItems, `C++ backend error: ${error.message}`);
+  }
+}
+async function submitQueueAction(path) {
+  if (queueBusy) return;
+  queueBusy = true;
+  const buttons = [document.querySelector("#enqueue-action"), document.querySelector("#dequeue-action")];
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const data = await window.kindredApi(path, { method: "POST" });
+    queueItems = data.items;
+    const message = Object.prototype.hasOwnProperty.call(data, "processed")
+      ? data.processed ? `Processed P${data.processed.priority} call from ${data.processed.place}` : "Queue is empty; nothing was processed"
+      : "Added a call to the queue";
+    renderQueue(queueItems, message);
+  } catch (error) {
+    renderQueue(queueItems, `C++ backend error: ${error.message}`);
+  } finally {
+    queueBusy = false;
+    buttons.forEach((button) => { button.disabled = false; });
+  }
 }
 function renderTree(type, severity, response, priority) {
   document.querySelector("#output").innerHTML = `<div class="decision-tree"><span class="tree-node">Emergency</span><i>→</i><span class="tree-node">${type.replace(" emergency", "")}</span><i>→</i><span class="tree-node">${severity}</span><i>→</i><span class="tree-node active">${priority}<small>${response}</small></span></div><div class="steps tree-steps"><span class="step">1 · Read emergency type</span><span class="step">2 · Compare severity</span><span class="step">3 · Reach response leaf</span></div><div class="log">root → type branch → severity branch → response leaf</div>`;
@@ -351,12 +288,14 @@ function setupControls() {
   }
   if (page === "queue") {
     document.querySelector("#enqueue-action").addEventListener("click", () => {
-      emergencyQueue.push({ place: document.querySelector("#queue-place").value, priority: Number(document.querySelector("#queue-priority").value), order: queueArrival++ });
-      renderQueue(emergencyQueue.toArray());
+      const query = new URLSearchParams({
+        place: document.querySelector("#queue-place").value,
+        priority: document.querySelector("#queue-priority").value
+      });
+      submitQueueAction(`/api/queue/add?${query}`);
     });
     document.querySelector("#dequeue-action").addEventListener("click", () => {
-      emergencyQueue.pop();
-      renderQueue(emergencyQueue.toArray());
+      submitQueueAction("/api/queue/next");
     });
   }
   if (page === "stack") {
@@ -384,3 +323,4 @@ function setupControls() {
 renderBase();
 if (page === "graph") setupGoogleGraphMap();
 setupControls();
+if (page === "queue") refreshQueue();

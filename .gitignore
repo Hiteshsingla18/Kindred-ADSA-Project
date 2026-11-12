@@ -1,5 +1,6 @@
 google-map-config.js
 *.class
+/backend/kindred-server.exe
 /cuchd_cc_175-Advanced Data Structures and Algorithms.pdf
 /Kindred_ADSA_Project_Report.docx
 /Kindred_ADSA_Project_Report.pdf

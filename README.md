@@ -1,50 +1,90 @@
 # Kindred City
 
-Kindred Grid is a tech-forward Smart City Route & Emergency Management System for the Advanced Data Structures project. The command centre is focused on New Delhi and uses real Delhi GPS coordinates rendered in a local map layer, so it remains visible even when external map tiles are blocked.
+**A Smart City emergency-response dashboard and data-structures demo for New Delhi.**
 
-## Run the website
+Kindred City combines a browser-based command centre with a small C++ server. Its sample data and routes are educational demonstrations—not a live dispatch system or turn-by-turn navigation service.
 
-For live GPS, run `start-localhost.ps1` in PowerShell, then open `http://localhost:8000`. The DSA modules are separate pages: [Array](./array.html), [Linked list](./linked-list.html), [Stack](./stack.html), [Queue](./queue.html), [Tree](./tree.html), and [Graph](./graph.html).
+## Features
 
-## Optional Google Maps satellite view
+- **Command centre:** view simulated emergencies, vehicles, and response stations.
+- **Priority queue:** process emergencies by priority, preserving arrival order for ties.
+- **Graph lab:** explore an illustrative weighted network and find the nearest eligible response station with Dijkstra's algorithm.
+- **DSA visualizations:** explore arrays, linked lists, stacks, queues, trees, and graphs.
+- **Delhi map:** view station coordinates on OpenStreetMap tiles, select a station for a straight-line preview, or optionally request browser location.
 
-1. In Google Cloud Console, enable **Maps JavaScript API** and billing for a project.
-2. Create an API key and restrict it to `http://localhost:8000/*`. Under API restrictions, allow **Maps JavaScript API**.
-3. Copy `google-map-config.example.js` to `google-map-config.js`.
-4. Put the key in `google-map-config.js`.
-5. Restart the local server and refresh the homepage.
+## Run locally
 
-The Graph lab runs Dijkstra on a small, explicit graph of connected sample locations, junctions, and response stations. Its edge weights are estimated distances between coordinates, and the road connections are illustrative rather than live road data; it is an ADSA demonstration, not turn-by-turn routing. The main dashboard map only previews straight-line GPS segments. Google Maps is an optional visual layer and the Graph lab does not require the Directions or Routes API. Without `google-map-config.js`, it uses an offline coordinate visualization.
+### Requirements
 
-The browser will ask for location permission when **Use my live location** is pressed. GPS is supplied by the browser/device; the local server only provides the trusted HTTP origin needed by the Geolocation API.
+- Windows and PowerShell
+- MinGW-w64 with `g++` available on `PATH`
+- An internet connection for the dashboard's Leaflet library and OpenStreetMap map tiles
 
-## DSA mapping
-
-- **Array:** sample response-time readings and emergency/vehicle records.
-- **Linked list:** the Java companion implements the vehicle fleet; the browser lab visualizes its operations.
-- **Stack:** the Java companion uses a stack for route history; the browser lab demonstrates push, pop, peek, and clear.
-- **Priority queue:** the browser lab implements an array-backed binary min-heap; inserts and removals take O(log n), and arrival order breaks ties. The Java companion uses Java's `PriorityQueue`.
-- **Decision tree:** the Java companion implements triage branches; the browser lab visualizes the decision path.
-- **Graph:** both the Java companion and browser lab use a weighted graph and Dijkstra. The browser lab searches an illustrative road network with estimated coordinate-based edge weights.
-
-The browser demo generates 100 deterministic emergency and vehicle records. Three emergency requests start in progress, 97 are waiting, and 85 of the 100 vehicles start ready; the dashboard counts are computed from those records. The displayed average response is an illustrative value, not a result calculated from the sample data. The Java companion in `java/SmartCityDsa.java` seeds 100 emergency and vehicle records and demonstrates the core structures.
-
-## Java ADSA companion
-
-The complete Java implementation is in [java/SmartCityDsa.java](./java/SmartCityDsa.java). It contains the Array, Linked List, Stack, Priority Queue, Decision Tree, weighted Graph, and Dijkstra examples in one file.
-
-From the project root on Windows, run:
+From the repository folder, run:
 
 ```powershell
-javac java\SmartCityDsa.java
-java -cp java SmartCityDsa
+.\start-localhost.ps1
 ```
 
-Install a JDK and add its `bin` folder to PATH if `javac` is not recognized.
+The script compiles `backend\main.cpp`, then serves the site at <http://localhost:8000>. Leave the PowerShell window open while using the site; press **Ctrl+C** to stop the server. No database or third-party C++ library is needed.
 
-## Run the Java companion
+To compile and start the server manually:
 
-```text
-javac java/SmartCityDsa.java
-java -cp java SmartCityDsa
+```powershell
+g++ -std=c++17 -static backend\main.cpp -lws2_32 -o backend\kindred-server.exe
+.\backend\kindred-server.exe --root . --port 8000
 ```
+
+## Pages
+
+| Page | What it demonstrates |
+| --- | --- |
+| [Command centre](./index.html) | Emergency dashboard, station map, and live-location prompt |
+| [Array](./array.html) | Indexed traffic readings |
+| [Linked list](./linked-list.html) | Vehicle nodes and links |
+| [Stack](./stack.html) | Route history and last-in, first-out operations |
+| [Queue](./queue.html) | Priority queue operations |
+| [Tree](./tree.html) | Emergency triage decisions |
+| [Graph](./graph.html) | Weighted network traversal and Dijkstra routing |
+
+The dashboard, queue, and graph operations use the C++ backend. The other DSA pages are browser-side visual demonstrations.
+
+## Project structure
+
+| Path | Purpose |
+| --- | --- |
+| `backend/main.cpp` | C++ server, sample data, heap, and graph algorithms |
+| `index.html`, `app.js`, `api.js` | Dashboard page and backend requests |
+| `array.html`, `linked-list.html`, `stack.html` | DSA demonstrations |
+| `queue.html`, `tree.html`, `graph.html` | DSA demonstrations |
+| `dsa-pages.js` | DSA page behavior and visualizations |
+| `start-localhost.ps1` | Windows build-and-run script |
+
+## Backend API
+
+The local server listens on `127.0.0.1:8000` and provides:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Check server health |
+| `GET` | `/api/dashboard?limit=8` | Get dashboard counts and emergency records |
+| `POST` | `/api/emergencies/next` | Assign the next waiting emergency |
+| `GET` | `/api/queue` | Read the priority queue |
+| `POST` | `/api/queue/add?place=Saket&priority=1` | Add an item to the queue |
+| `POST` | `/api/queue/next` | Process the highest-priority queue item |
+| `GET` | `/api/route?location=Saket&type=all` | Find a response station using Dijkstra's algorithm |
+
+Sample data is held in memory and resets when the server restarts.
+
+## Map and location
+
+The dashboard uses **Leaflet** with **OpenStreetMap** street tiles. It needs internet access to load the map library and tiles, but no map API key. OpenStreetMap attribution is visible on the map. Selecting a station previews a straight line from Connaught Place; browser GPS is requested only after pressing **Use my live location**. If the device is more than 25 km from Delhi, the page reports its coordinates and distance while keeping the map focused on Delhi.
+
+The Graph lab can optionally display Google satellite imagery. To enable it, configure the Google Maps JavaScript API and billing, restrict a key to `http://localhost:8000/*`, and copy `google-map-config.example.js` to `google-map-config.js` with the key. The Graph lab does not use Google Directions or Routes APIs.
+
+## Scope and limitations
+
+- Emergency, vehicle, and station data are simulated; no real emergency services are contacted.
+- The Graph lab uses illustrative road connections and estimated distances, not live road or traffic data.
+- The dashboard map's line is a straight-line coordinate preview, not a driving route.
+- The displayed average response time is illustrative.
