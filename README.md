@@ -14,7 +14,7 @@ For live GPS, run `start-localhost.ps1` in PowerShell, then open `http://localho
 4. Put the key in `google-map-config.js`.
 5. Restart the local server and refresh the homepage.
 
-The Graph lab uses a map only as a visual layer. The browser demo currently ranks eligible stations by estimated straight-line distance; it does not yet run Dijkstra over a road network. The Java companion does include a weighted graph and Dijkstra implementation. The browser Graph lab does not require Directions or Routes API. Without `google-map-config.js`, it uses an offline coordinate visualization.
+The Graph lab runs Dijkstra on a small, explicit graph of connected sample locations, junctions, and response stations. Its edge weights are estimated distances between coordinates, and the road connections are illustrative rather than live road data; it is an ADSA demonstration, not turn-by-turn routing. The main dashboard map only previews straight-line GPS segments. Google Maps is an optional visual layer and the Graph lab does not require the Directions or Routes API. Without `google-map-config.js`, it uses an offline coordinate visualization.
 
 The browser will ask for location permission when **Use my live location** is pressed. GPS is supplied by the browser/device; the local server only provides the trusted HTTP origin needed by the Geolocation API.
 
@@ -23,11 +23,11 @@ The browser will ask for location permission when **Use my live location** is pr
 - **Array:** sample response-time readings and emergency/vehicle records.
 - **Linked list:** the Java companion implements the vehicle fleet; the browser lab visualizes its operations.
 - **Stack:** the Java companion uses a stack for route history; the browser lab demonstrates push, pop, peek, and clear.
-- **Priority queue:** the Java companion uses Java's `PriorityQueue`; the browser simulation currently sorts requests by priority rather than using a heap.
+- **Priority queue:** the browser lab implements an array-backed binary min-heap; inserts and removals take O(log n), and arrival order breaks ties. The Java companion uses Java's `PriorityQueue`.
 - **Decision tree:** the Java companion implements triage branches; the browser lab visualizes the decision path.
-- **Graph:** the Java companion uses a weighted graph and Dijkstra. The browser map currently ranks stations by straight-line distance and is not yet a Dijkstra visualization.
+- **Graph:** both the Java companion and browser lab use a weighted graph and Dijkstra. The browser lab searches an illustrative road network with estimated coordinate-based edge weights.
 
-The browser demo generates 100 deterministic emergency and vehicle records. The Java companion in `java/SmartCityDsa.java` seeds 100 emergency and vehicle records and demonstrates the core structures.
+The browser demo generates 100 deterministic emergency and vehicle records. Three emergency requests start in progress, 97 are waiting, and 85 of the 100 vehicles start ready; the dashboard counts are computed from those records. The displayed average response is an illustrative value, not a result calculated from the sample data. The Java companion in `java/SmartCityDsa.java` seeds 100 emergency and vehicle records and demonstrates the core structures.
 
 ## Java ADSA companion
 

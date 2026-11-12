@@ -3,9 +3,9 @@ const views = {
   array: { title: "Array", kicker: "01 / TRAFFIC SENSOR DATA", description: "A fixed, indexed row of traffic-density readings that helps the city spot congestion.", why: "Why: sensor values arrive in predictable slots and need quick indexed access.", how: "How: search for the busiest reading, sort the values, or reverse the time window to compare flow.", complexity: "O(n) search · O(n log n) sort", action: "Run operation" },
   linked: { title: "Linked list", kicker: "02 / RESOURCE FLOW", description: "A chain of vehicle nodes that can grow and shrink without moving the rest of the fleet.", why: "Why: vehicles continuously enter and leave the available fleet.", how: "How: insert a vehicle node when it is free; unlink it when dispatched.", complexity: "O(1) insert", action: "Insert vehicle" },
   stack: { title: "Stack", kicker: "03 / ROUTE HISTORY", description: "The last route chosen sits on top, ready for undo and redo.", why: "Why: dispatchers often need to return to the most recently viewed route.", how: "How: push every selected route; pop the top route to undo it.", complexity: "O(1) push / pop", action: "Push route" },
-  queue: { title: "Priority queue", kicker: "04 / EMERGENCY DESK", description: "Calls wait fairly, while the highest-priority emergency gets processed first.", why: "Why: a critical medical call cannot wait behind a routine complaint.", how: "How: enqueue each call with priority; dequeue the smallest priority number.", complexity: "O(log n) priority", action: "Add emergency" },
+  queue: { title: "Priority queue", kicker: "04 / EMERGENCY DESK", description: "Calls wait fairly, while the highest-priority emergency gets processed first.", why: "Why: a critical medical call cannot wait behind a routine complaint.", how: "How: a binary min-heap keeps the smallest priority number at the root; arrival order breaks ties.", complexity: "O(log n) insert / remove", action: "Add emergency" },
   tree: { title: "Decision tree", kicker: "05 / EMERGENCY TRIAGE", description: "A branching triage model that turns emergency answers into the right team and response priority.", why: "Why: the dispatcher needs a consistent route from emergency type to action.", how: "How: traverse one question at a time until the leaf assigns a team, vehicle, and priority.", complexity: "O(height) traversal", action: "Animate traversal" },
-  graph: { title: "Graph", kicker: "06 / GPS ROUTING", description: "Vertices are response stations; weighted edges are roads between them.", why: "Why: an emergency route depends on connections and travel distance.", how: "How: visit neighbours with BFS/DFS or relax edge weights using Dijkstra.", complexity: "Dijkstra O(E log V)", action: "Animate route" }
+  graph: { title: "Graph", kicker: "06 / GPS ROUTING", description: "Vertices are response stations and junctions; weighted edges are estimated road segments.", why: "Why: an emergency route depends on connected roads, not just which station is closest in a straight line.", how: "How: Dijkstra repeatedly settles the reachable place with the lowest known distance.", complexity: "Dijkstra O(E log V)", action: "Animate route" }
 };
 function selectedStationTypes() {
   return [...document.querySelectorAll(".station-filter:checked")].map((input) => input.value);
@@ -44,13 +44,156 @@ const emergencyLocations = {
   "Saket": [28.5244, 77.2066], "Dwarka Sector 10": [28.5813, 77.0585],
   "Rohini Sector 18": [28.7376, 77.1180], "Hauz Khas": [28.5494, 77.2001]
 };
+const roadJunctions = {
+  "Central Delhi Junction": [28.632, 77.224],
+  "South Delhi Junction": [28.565, 77.210],
+  "West Delhi Junction": [28.625, 77.120],
+  "North Delhi Junction": [28.700, 77.185],
+  "East Delhi Junction": [28.675, 77.270]
+};
+const roadConnections = [
+  ["Chandni Chowk", "Central Delhi Junction"],
+  ["India Gate", "Central Delhi Junction"],
+  ["Central Police Station", "Central Delhi Junction"],
+  ["Lok Nayak Hospital", "Central Delhi Junction"],
+  ["Central Delhi Junction", "South Delhi Junction"],
+  ["Central Delhi Junction", "North Delhi Junction"],
+  ["Central Delhi Junction", "East Delhi Junction"],
+  ["North Delhi Junction", "West Delhi Junction"],
+  ["North Delhi Junction", "GTB Hospital"],
+  ["North Delhi Junction", "Rohini Sector 18 Police"],
+  ["Rohini Sector 18", "Rohini Sector 18 Police"],
+  ["South Delhi Junction", "AIIMS Trauma Centre"],
+  ["South Delhi Junction", "Safdarjung Hospital"],
+  ["South Delhi Junction", "Hauz Khas Police Station"],
+  ["South Delhi Junction", "Saket Police Station"],
+  ["Hauz Khas", "Hauz Khas Police Station"],
+  ["Saket", "Saket Police Station"],
+  ["South Delhi Junction", "West Delhi Junction"],
+  ["West Delhi Junction", "Dwarka Sector 10 Police"],
+  ["Dwarka Sector 10", "Dwarka Sector 10 Police"],
+  ["West Delhi Junction", "Deen Dayal Upadhyay Hospital"],
+  ["East Delhi Junction", "GTB Hospital"]
+];
+let emergencyQueue = null;
+let queueArrival = 0;
+let graphRunId = 0;
+
+class MinHeap {
+  constructor(compare) {
+    this.items = [];
+    this.compare = compare;
+  }
+
+  get size() {
+    return this.items.length;
+  }
+
+  push(item) {
+    this.items.push(item);
+    let index = this.items.length - 1;
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (this.compare(this.items[index], this.items[parent]) >= 0) break;
+      [this.items[index], this.items[parent]] = [this.items[parent], this.items[index]];
+      index = parent;
+    }
+  }
+
+  pop() {
+    if (!this.items.length) return undefined;
+    const first = this.items[0];
+    const last = this.items.pop();
+    if (this.items.length) {
+      this.items[0] = last;
+      let index = 0;
+      while (true) {
+        const left = index * 2 + 1;
+        const right = left + 1;
+        let smallest = index;
+        if (left < this.items.length && this.compare(this.items[left], this.items[smallest]) < 0) smallest = left;
+        if (right < this.items.length && this.compare(this.items[right], this.items[smallest]) < 0) smallest = right;
+        if (smallest === index) break;
+        [this.items[index], this.items[smallest]] = [this.items[smallest], this.items[index]];
+        index = smallest;
+      }
+    }
+    return first;
+  }
+
+  toArray() {
+    return [...this.items];
+  }
+}
+
+function coordinatesFor(name) {
+  if (emergencyLocations[name]) return emergencyLocations[name];
+  if (roadJunctions[name]) return roadJunctions[name];
+  const station = responseStations[name];
+  return station ? [station.lat, station.lng] : null;
+}
+
+function estimatedDistanceKm(from, to) {
+  const fromCoordinates = coordinatesFor(from);
+  const toCoordinates = coordinatesFor(to);
+  if (!fromCoordinates || !toCoordinates) throw new Error(`Unknown road-network location: ${!fromCoordinates ? from : to}`);
+  return Math.hypot((fromCoordinates[0] - toCoordinates[0]) * 111, (fromCoordinates[1] - toCoordinates[1]) * 103);
+}
+
+function createRoadGraph() {
+  const graph = new Map();
+  [...Object.keys(emergencyLocations), ...Object.keys(roadJunctions), ...Object.keys(responseStations)].forEach((name) => graph.set(name, []));
+  roadConnections.forEach(([from, to]) => {
+    const distance = estimatedDistanceKm(from, to);
+    graph.get(from).push({ to, distance });
+    graph.get(to).push({ to: from, distance });
+  });
+  return graph;
+}
+
+const roadGraph = createRoadGraph();
+
+function findNearestStation(start, targetNames) {
+  const targets = new Set(targetNames);
+  const distances = new Map([...roadGraph.keys()].map((name) => [name, Infinity]));
+  const previous = new Map();
+  const settled = [];
+  const pending = new MinHeap((a, b) => a.distance - b.distance || a.name.localeCompare(b.name));
+  distances.set(start, 0);
+  pending.push({ name: start, distance: 0 });
+
+  while (pending.size) {
+    const current = pending.pop();
+    if (current.distance !== distances.get(current.name)) continue;
+    settled.push(current);
+    if (targets.has(current.name)) {
+      const path = [];
+      for (let name = current.name; name; name = previous.get(name)) path.unshift(name);
+      return { station: current.name, distance: current.distance, path, settled };
+    }
+    for (const edge of roadGraph.get(current.name) || []) {
+      const candidate = current.distance + edge.distance;
+      if (candidate < distances.get(edge.to)) {
+        distances.set(edge.to, candidate);
+        previous.set(edge.to, current.name);
+        pending.push({ name: edge.to, distance: candidate });
+      }
+    }
+  }
+  return { station: null, distance: Infinity, path: [], settled };
+}
 
 function renderBase() {
   const output = document.querySelector("#output");
   if (page === "array") renderArray([12, 8, 15, 6, 11, 9, 18, 7, 14, 10, 5, 13]);
   if (page === "linked") renderLinked(["VH-014 · Ambulance", "VH-038 · Fire truck", "VH-061 · Patrol car", "VH-087 · Ambulance"]);
   if (page === "stack") renderStack(["India Gate → Saket", "CP → Lajpat Nagar", "Dwarka → Rohini"]);
-  if (page === "queue") renderQueue([{ place: "India Gate", priority: 1 }, { place: "Connaught Place", priority: 1 }, { place: "Saket", priority: 2 }, { place: "Dwarka", priority: 3 }]);
+  if (page === "queue") {
+    emergencyQueue = new MinHeap((a, b) => a.priority - b.priority || a.order - b.order);
+    queueArrival = 0;
+    [{ place: "India Gate", priority: 1 }, { place: "Connaught Place", priority: 1 }, { place: "Saket", priority: 2 }, { place: "Dwarka", priority: 3 }].forEach((item) => emergencyQueue.push({ ...item, order: queueArrival++ }));
+    renderQueue(emergencyQueue.toArray());
+  }
   if (page === "tree") renderTree("Medical emergency", "Critical", "Ambulance + trauma team", "P1");
   if (page === "graph") renderRoute([]);
 }
@@ -60,55 +203,92 @@ function renderArray(values, activeIndex = -1, log = "Choose an operation to ins
 function renderGraphGps(stops, emergencyName = "") {
   const target = document.querySelector("#graph-map");
   if (!target) return;
-  const minLat = 28.50, maxLat = 28.77, minLng = 77.02, maxLng = 77.25;
+  const minLat = 28.50, maxLat = 28.77, minLng = 77.02, maxLng = 77.32;
   const project = ([lat, lng]) => `${((lng - minLng) / (maxLng - minLng) * 100).toFixed(2)},${((maxLat - lat) / (maxLat - minLat) * 100).toFixed(2)}`;
+  const roads = roadConnections.map(([from, to]) => {
+    const [x1, y1] = project(coordinatesFor(from)).split(",");
+    const [x2, y2] = project(coordinatesFor(to)).split(",");
+    return `<line class="graph-gps-road" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"></line>`;
+  }).join("");
   const markers = visibleResponseStations().map(([name, station]) => {
     const [left, top] = project([station.lat, station.lng]).split(",");
     return `<span class="graph-gps-marker station-marker" data-name="${name}" style="left:${left}%;top:${top}%"><i></i><b>${name}</b></span>`;
   }).join("");
   const emergencyMarker = emergencyName ? (() => { const [left, top] = project(emergencyLocations[emergencyName]).split(","); return `<span class="graph-gps-marker emergency-marker" style="left:${left}%;top:${top}%"><i></i><b>${emergencyName}</b></span>`; })() : "";
-  target.innerHTML = `<div class="graph-gps-grid"></div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M5 88 L28 67 L48 50 L76 32 L95 12" class="graph-gps-road"/><path d="M28 67 L42 17 L76 32 L88 78" class="graph-gps-road faint"/></svg>${markers}${emergencyMarker}<span class="graph-gps-label">SATELLITE RESPONSE NETWORK</span><span class="graph-gps-status">${emergencyName ? "Emergency location selected" : "Select a location to dispatch"}</span>`;
+  target.innerHTML = `<div class="graph-gps-grid"></div><svg viewBox="0 0 100 100" preserveAspectRatio="none">${roads}</svg>${markers}${emergencyMarker}<span class="graph-gps-label">ILLUSTRATIVE ROAD NETWORK</span><span class="graph-gps-status">${emergencyName ? "Emergency location selected" : "Select a location to dispatch"}</span>`;
 }
-function renderDistanceNetwork(location, ranked = []) {
+function renderDistanceNetwork(location, path = []) {
   const target = document.querySelector("#distance-network");
   if (!target || !location) return;
-  const center = { x: 50, y: 50 };
-  const positions = [[17, 18], [82, 18], [12, 76], [88, 76], [50, 10], [50, 90], [18, 50], [82, 50]];
-  const maxDistance = Math.max(...ranked.map((item) => item.distance), 1);
-  const lines = ranked.map((item, index) => {
-    const [x, y] = positions[index % positions.length];
-    const shortest = index === 0;
-    return `<line class="distance-edge ${shortest ? "shortest-edge" : ""}" x1="${center.x}" y1="${center.y}" x2="${x}" y2="${y}" style="--edge-delay:${index * 180}ms"></line><text class="distance-label" x="${(center.x + x) / 2}" y="${(center.y + y) / 2 - 2}">${item.distance.toFixed(1)} km</text><g class="distance-node ${shortest ? "shortest-node" : ""}" transform="translate(${x} ${y})"><circle r="8"></circle><text y="17">${item.name.replace(" Police", "").replace(" Hospital", "")}</text></g>`;
+  const project = (name) => {
+    const [lat, lng] = coordinatesFor(name);
+    return { x: 8 + ((lng - 77.02) / 0.30) * 84, y: 8 + ((28.77 - lat) / 0.27) * 84 };
+  };
+  const routeEdges = new Set(path.slice(1).map((name, index) => `${path[index]}|${name}`));
+  const lines = roadConnections.map(([from, to], index) => {
+    const start = project(from);
+    const end = project(to);
+    const routeEdge = routeEdges.has(`${from}|${to}`) || routeEdges.has(`${to}|${from}`);
+    return `<line class="distance-edge ${routeEdge ? "shortest-edge route-revealed" : ""}" x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" style="--edge-delay:${index * 30}ms"></line>`;
   }).join("");
-  target.innerHTML = `<svg viewBox="0 0 100 100" role="img" aria-label="Distance weighted response graph">${lines}<g class="emergency-node" transform="translate(${center.x} ${center.y})"><circle r="11"></circle><text y="20">${location}</text></g></svg>`;
+  const nodes = [...Object.keys(emergencyLocations), ...Object.keys(roadJunctions), ...Object.keys(responseStations)];
+  const markers = nodes.map((name) => {
+    const position = project(name);
+    const isStation = Object.prototype.hasOwnProperty.call(responseStations, name);
+    const isSource = name === location;
+    const isOnRoute = path.includes(name);
+    const label = name.replace(" Police Station", " Police").replace(" Police", "").replace(" Hospital", "").replace(" Junction", " Jct.");
+    return `<g class="distance-node ${isStation ? "station-node" : "junction-node"} ${isOnRoute ? "shortest-node" : ""}" transform="translate(${position.x} ${position.y})"><circle r="${isSource ? 3.2 : 2.2}"></circle><text y="-3">${label}</text></g>`;
+  }).join("");
+  const sourcePosition = project(location);
+  const source = `<g class="emergency-node" transform="translate(${sourcePosition.x} ${sourcePosition.y})"><circle r="3.5"></circle></g>`;
+  target.innerHTML = `<svg viewBox="0 0 100 100" role="img" aria-label="Illustrative weighted road graph with Dijkstra route">${lines}${markers}${source}</svg>`;
 }
 function runEmergencyTraversal(location) {
   const summary = document.querySelector("#route-summary");
   const steps = document.querySelector("#graph-steps");
-  const [lat, lng] = emergencyLocations[location];
   const eligibleStations = visibleResponseStations();
+  const runId = ++graphRunId;
   if (!eligibleStations.length) {
     summary.innerHTML = "<strong>Select at least one checkpoint type.</strong><span class=\"route-stat\">Choose Police stations or Hospitals before starting traversal.</span>";
     return;
   }
-  const ranked = eligibleStations.map(([name, station]) => ({ name, station, distance: Math.hypot((lat - station.lat) * 111, (lng - station.lng) * 103) })).sort((a, b) => a.distance - b.distance);
+  const result = findNearestStation(location, eligibleStations.map(([name]) => name));
+  if (!result.station) {
+    summary.innerHTML = "<strong>No eligible station is reachable.</strong><span class=\"route-stat\">Check the road connections and selected checkpoint types.</span>";
+    return;
+  }
+  const station = responseStations[result.station];
   if (window.kindredGraphMap) {
+    const [lat, lng] = emergencyLocations[location];
+    if (window.kindredGraphEmergencyMarker) window.kindredGraphEmergencyMarker.setMap(null);
     const emergencyMarker = new google.maps.Marker({ position: { lat, lng }, map: window.kindredGraphMap, title: `Emergency: ${location}`, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#e87862", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } });
     window.kindredGraphMap.panTo({ lat, lng });
     window.kindredGraphEmergencyMarker = emergencyMarker;
+    if (window.kindredGraphRoute) window.kindredGraphRoute.setMap(null);
+    window.kindredGraphRoute = new google.maps.Polyline({
+      path: result.path.map((name) => {
+        const [routeLat, routeLng] = coordinatesFor(name);
+        return { lat: routeLat, lng: routeLng };
+      }),
+      map: window.kindredGraphMap,
+      strokeColor: "#1769ff",
+      strokeOpacity: 0.9,
+      strokeWeight: 5
+    });
   } else {
     renderGraphGps([], location);
   }
-  renderDistanceNetwork(location, ranked);
-  steps.innerHTML = ranked.map((item, index) => `<div class="graph-step" data-step="${index}"><span>${index + 1}</span>Checking ${item.name}<small>${item.distance.toFixed(1)} km weighted edge</small></div>`).join("");
-  summary.innerHTML = "Dijkstra is traversing the response network…";
-  ranked.forEach((item, index) => setTimeout(() => {
-    document.querySelector(`[data-step="${index}"]`).classList.add("visited");
-    if (index === ranked.length - 1) {
-      const nearest = ranked[0];
-      document.querySelector(`[data-step="0"]`).classList.add("selected");
-      document.querySelector("#distance-network .shortest-edge").classList.add("route-revealed");
-      summary.innerHTML = `<strong>Request sent to nearest station</strong><span class="route-stat">${location} → ${nearest.name}</span><span class="route-stat">${nearest.station.type} · ${nearest.distance.toFixed(1)} km estimated network distance · dispatch ready</span>`;
+  renderDistanceNetwork(location, result.path);
+  steps.innerHTML = result.settled.map((item, index) => `<div class="graph-step" data-step="${index}"><span>${index + 1}</span>Settled ${item.name}<small>${item.distance.toFixed(1)} km estimated from ${location}</small></div>`).join("");
+  summary.innerHTML = "Dijkstra is comparing the lowest known distance at each connected place…";
+  result.settled.forEach((item, index) => setTimeout(() => {
+    if (runId !== graphRunId) return;
+    const step = document.querySelector(`[data-step="${index}"]`);
+    if (step) step.classList.add("visited");
+    if (index === result.settled.length - 1) {
+      if (step) step.classList.add("selected");
+      summary.innerHTML = `<strong>Request sent to nearest eligible station</strong><span class="route-stat">${result.path.join(" → ")}</span><span class="route-stat">${station.type} · ${result.distance.toFixed(1)} km estimated graph distance</span>`;
     }
   }, index * 600));
 }
@@ -145,8 +325,8 @@ function renderStack(items) {
   document.querySelector("#output").innerHTML = `<div class="stack-cells">${items.map((item, i) => `<span class="cell ${i === items.length - 1 ? "active" : ""}">${item}${i === items.length - 1 ? " · TOP" : ""}</span>`).reverse().join("")}</div><div class="log">TOP → ${top || "empty"} · POP removes the top item first · bottom stays until it reaches the top</div>`;
 }
 function renderQueue(items) {
-  const sorted = [...items].sort((a, b) => a.priority - b.priority);
-  document.querySelector("#output").innerHTML = `<div class="queue-cells">${sorted.map((item, i) => `<span class="cell ${i === 0 ? "active" : ""}">P${item.priority} · ${item.place}</span>`).join("")}</div><div class="log">front → ${sorted[0] ? `P${sorted[0].priority} at ${sorted[0].place}` : "empty"} · priority then FIFO</div>`;
+  const root = items[0];
+  document.querySelector("#output").innerHTML = `<div class="queue-cells">${items.map((item, index) => `<span class="cell ${index === 0 ? "active" : ""}"><small>index ${index}</small>P${item.priority} · ${item.place}</span>`).join("")}</div><div class="log">heap array · root → ${root ? `P${root.priority} at ${root.place}` : "empty"} · parents have higher priority than their children · equal priorities use arrival order</div>`;
 }
 function renderTree(type, severity, response, priority) {
   document.querySelector("#output").innerHTML = `<div class="decision-tree"><span class="tree-node">Emergency</span><i>→</i><span class="tree-node">${type.replace(" emergency", "")}</span><i>→</i><span class="tree-node">${severity}</span><i>→</i><span class="tree-node active">${priority}<small>${response}</small></span></div><div class="steps tree-steps"><span class="step">1 · Read emergency type</span><span class="step">2 · Compare severity</span><span class="step">3 · Reach response leaf</span></div><div class="log">root → type branch → severity branch → response leaf</div>`;
@@ -170,9 +350,14 @@ function setupControls() {
     });
   }
   if (page === "queue") {
-    let items = [{ place: "India Gate", priority: 1 }, { place: "Connaught Place", priority: 1 }, { place: "Saket", priority: 2 }, { place: "Dwarka", priority: 3 }];
-    document.querySelector("#enqueue-action").addEventListener("click", () => { items.push({ place: document.querySelector("#queue-place").value, priority: Number(document.querySelector("#queue-priority").value) }); renderQueue(items); });
-    document.querySelector("#dequeue-action").addEventListener("click", () => { items.sort((a, b) => a.priority - b.priority); items.shift(); renderQueue(items); });
+    document.querySelector("#enqueue-action").addEventListener("click", () => {
+      emergencyQueue.push({ place: document.querySelector("#queue-place").value, priority: Number(document.querySelector("#queue-priority").value), order: queueArrival++ });
+      renderQueue(emergencyQueue.toArray());
+    });
+    document.querySelector("#dequeue-action").addEventListener("click", () => {
+      emergencyQueue.pop();
+      renderQueue(emergencyQueue.toArray());
+    });
   }
   if (page === "stack") {
     let items = ["India Gate → Saket", "CP → Lajpat Nagar", "Dwarka → Rohini"];

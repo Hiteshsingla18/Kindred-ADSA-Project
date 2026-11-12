@@ -13,6 +13,8 @@ function renderEmergencies() {
   document.querySelector("#emergency-total").textContent = emergencies.length;
   document.querySelector("#queue-count").textContent = `${emergencies.filter((item) => item.status === "Waiting").length} waiting`;
   document.querySelector("#open-count").textContent = emergencies.filter((item) => item.status !== "Completed").length;
+  document.querySelector("#ready-count").textContent = vehicles.filter((vehicle) => vehicle.status === "Ready").length;
+  document.querySelector("#zone-count").textContent = new Set(emergencies.map((item) => item.location)).size;
 }
 function setupDelhiMap() {
   const target = document.querySelector("#delhi-map");
@@ -55,17 +57,16 @@ function setupDelhiMap() {
   });
 }
 function renderLocalMap(target, stations, bounds, project, liveCoordinates) {
-  const route = stations.slice(0, 6).map((station) => project(station[1], station[2])).join(" ");
   const markers = stations.map(([name, lat, lng], index) => `<button class="gps-marker ${index === 0 ? "active" : ""}" style="left:${project(lat, lng).split(",")[0]}%;top:${project(lat, lng).split(",")[1]}%" data-name="${name}" data-lat="${lat}" data-lng="${lng}" title="${name} · ${lat}, ${lng}"><span></span><b>${name}</b></button>`).join("");
   const live = liveCoordinates ? `<span class="live-marker" style="left:${project(liveCoordinates[0], liveCoordinates[1]).split(",")[0]}%;top:${project(liveCoordinates[0], liveCoordinates[1]).split(",")[1]}%" title="Your live position"></span>` : "";
-  target.innerHTML = `<div class="gps-map"><div class="gps-grid"></div><div class="gps-label gps-north">${bounds.maxLat.toFixed(2)}° N</div><div class="gps-label gps-south">${bounds.minLat.toFixed(2)}° N</div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path class="gps-road" d="M8 84 L31 69 L48 50 L64 35 L82 19"/><path class="gps-road faint" d="M31 69 L44 25 L64 35 L71 78"/><polyline class="gps-route" points="${route}"/></svg>${markers}${live}<div class="gps-legend"><strong>DELHI GPS NETWORK</strong><span>● station marker</span><span>● live device position</span><span>⌁ calculated route</span></div></div>`;
+  target.innerHTML = `<div class="gps-map"><div class="gps-grid"></div><div class="gps-label gps-north">${bounds.maxLat.toFixed(2)}° N</div><div class="gps-label gps-south">${bounds.minLat.toFixed(2)}° N</div><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path class="gps-road" d="M8 84 L31 69 L48 50 L64 35 L82 19"/><path class="gps-road faint" d="M31 69 L44 25 L64 35 L71 78"/><polyline class="gps-route" points=""></polyline></svg>${markers}${live}<div class="gps-legend"><strong>DELHI GPS NETWORK</strong><span>● station marker</span><span>● live device position</span><span>⌁ straight-line preview</span></div></div>`;
 }
 function setupLocalMarkers(target, project) {
   target.querySelectorAll(".gps-marker").forEach((marker) => marker.addEventListener("click", () => {
     target.querySelectorAll(".gps-marker").forEach((item) => item.classList.remove("active"));
     marker.classList.add("active");
     target.querySelector(".gps-route").setAttribute("points", `${project(28.6315, 77.2167)} ${project(Number(marker.dataset.lat), Number(marker.dataset.lng))}`);
-    document.querySelector("#route-result").textContent = `Dijkstra · ${marker.dataset.name} · GPS route active`;
+    document.querySelector("#route-result").textContent = `Straight-line GPS preview · ${marker.dataset.name}`;
   }));
 }
 function loadGoogleMap(target, stations, key) {
@@ -83,11 +84,11 @@ function loadGoogleMap(target, stations, key) {
       streetViewControl: true,
       fullscreenControl: true
     });
-    const route = new google.maps.Polyline({ path: stations.slice(0, 6).map(([, lat, lng]) => ({ lat, lng })), geodesic: true, strokeColor: "#e87862", strokeOpacity: 0.9, strokeWeight: 4, map });
+    const route = new google.maps.Polyline({ path: [], geodesic: true, strokeColor: "#e87862", strokeOpacity: 0.9, strokeWeight: 4, map });
     stations.forEach(([name, lat, lng], index) => {
       const marker = new google.maps.Marker({ position: { lat, lng }, map, title: name, label: index === 0 ? "A" : undefined });
       const info = new google.maps.InfoWindow({ content: `<strong>${name}</strong><br>GPS ${lat.toFixed(5)}, ${lng.toFixed(5)}<br><small>Real Delhi coordinate</small>` });
-      marker.addListener("click", () => { info.open({ map, anchor: marker }); route.setPath([stations[0], [name, lat, lng]].map(([, pointLat, pointLng]) => ({ lat: pointLat, lng: pointLng }))); document.querySelector("#route-result").textContent = `GPS route · ${name}`; });
+      marker.addListener("click", () => { info.open({ map, anchor: marker }); route.setPath([{ lat: stations[0][1], lng: stations[0][2] }, { lat, lng }]); document.querySelector("#route-result").textContent = `Straight-line GPS preview · ${name}`; });
     });
     const locateButton = document.querySelector("#locate-me");
     if (locateButton) locateButton.addEventListener("click", () => {
@@ -110,5 +111,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const more = document.querySelector("#show-more");
   if (more) more.addEventListener("click", () => { visibleRows += 8; renderEmergencies(); });
   const process = document.querySelector("#process-btn");
-  if (process) process.addEventListener("click", () => { const next = queue().find((item) => item.status === "Waiting"); if (!next) return; next.status = "In progress"; const ready = vehicles.find((vehicle) => vehicle.status === "Ready"); if (ready) ready.status = "On call"; renderEmergencies(); document.querySelector("#ready-count").textContent = vehicles.filter((vehicle) => vehicle.status === "Ready").length; process.textContent = "Next request assigned ✓"; setTimeout(() => { process.innerHTML = "Process next <span>→</span>"; }, 1800); });
+  if (process) process.addEventListener("click", () => {
+    const next = queue().find((item) => item.status === "Waiting");
+    const ready = vehicles.find((vehicle) => vehicle.status === "Ready");
+    if (!next || !ready) return;
+    next.status = "In progress";
+    ready.status = "On call";
+    renderEmergencies();
+    process.textContent = "Next request assigned ✓";
+    setTimeout(() => { process.innerHTML = "Process next <span>→</span>"; }, 1800);
+  });
 });
