@@ -98,23 +98,195 @@ function renderBase() {
 function renderArray(values, activeIndex = -1, log = "Choose an operation to inspect the response-time readings.") {
   document.querySelector("#output").innerHTML = `<div class="array-cells">${values.map((value, i) => `<span class="cell ${i === activeIndex ? "active" : ""}"><small>index ${i}</small>${value}<em> min</em></span>`).join("")}</div><div class="array-meter"><span style="width:${Math.min(Math.max(Math.max(...values) * 5, 0), 100)}%"></span></div><div class="log">${log}</div>`;
 }
-function renderGraphGps(stops, emergencyName = "") {
+let graphMap = null;
+let graphRoadGroup = null;
+let graphStationGroup = null;
+let graphEmergencyGroup = null;
+let graphJunctionGroup = null;
+let graphRouteGroup = null;
+let graphVehicleMarker = null;
+
+function setupLeafletGraphMap() {
   const target = document.querySelector("#graph-map");
-  if (!target) return;
-  const minLat = 28.50, maxLat = 28.77, minLng = 77.02, maxLng = 77.32;
-  const project = ([lat, lng]) => `${((lng - minLng) / (maxLng - minLng) * 100).toFixed(2)},${((maxLat - lat) / (maxLat - minLat) * 100).toFixed(2)}`;
-  const roads = roadConnections.map(([from, to]) => {
-    const [x1, y1] = project(coordinatesFor(from)).split(",");
-    const [x2, y2] = project(coordinatesFor(to)).split(",");
-    return `<line class="graph-gps-road" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"></line>`;
-  }).join("");
-  const markers = visibleResponseStations().map(([name, station]) => {
-    const [left, top] = project([station.lat, station.lng]).split(",");
-    return `<span class="graph-gps-marker station-marker" data-name="${name}" style="left:${left}%;top:${top}%"><i></i><b>${name}</b></span>`;
-  }).join("");
-  const emergencyMarker = emergencyName ? (() => { const [left, top] = project(emergencyLocations[emergencyName]).split(","); return `<span class="graph-gps-marker emergency-marker" style="left:${left}%;top:${top}%"><i></i><b>${emergencyName}</b></span>`; })() : "";
-  target.innerHTML = `<div class="graph-gps-grid"></div><svg viewBox="0 0 100 100" preserveAspectRatio="none">${roads}</svg>${markers}${emergencyMarker}<span class="graph-gps-label">ILLUSTRATIVE ROAD NETWORK</span><span class="graph-gps-status">${emergencyName ? "Emergency location selected" : "Select a location to dispatch"}</span>`;
+  if (!target || !window.L) return;
+  if (graphMap) return;
+
+  graphMap = L.map(target, {
+    scrollWheelZoom: true
+  });
+
+  const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(graphMap);
+
+  graphRoadGroup = L.layerGroup().addTo(graphMap);
+  graphJunctionGroup = L.layerGroup().addTo(graphMap);
+  graphStationGroup = L.layerGroup().addTo(graphMap);
+  graphEmergencyGroup = L.layerGroup().addTo(graphMap);
+  graphRouteGroup = L.layerGroup().addTo(graphMap);
+
+  renderGraphTopology();
+  refreshStationMarkers();
+  refreshEmergencyMarkers();
+
+  const allCoords = [
+    ...Object.values(emergencyLocations),
+    ...Object.values(responseStations).map((s) => [s.lat, s.lng]),
+    ...Object.values(roadJunctions)
+  ];
+  const networkBounds = L.latLngBounds(allCoords).pad(0.15);
+  graphMap.fitBounds(networkBounds, { padding: [16, 16], maxZoom: 12 });
+
+  setTimeout(() => {
+    if (graphMap) {
+      graphMap.invalidateSize();
+      graphMap.fitBounds(networkBounds, { padding: [16, 16], maxZoom: 12 });
+    }
+  }, 200);
 }
+
+function renderGraphTopology() {
+  if (!graphMap || !graphRoadGroup) return;
+  graphRoadGroup.clearLayers();
+  graphJunctionGroup.clearLayers();
+
+  roadConnections.forEach(([from, to]) => {
+    const fromCoord = coordinatesFor(from);
+    const toCoord = coordinatesFor(to);
+    if (!fromCoord || !toCoord) return;
+    const polyline = L.polyline([fromCoord, toCoord], {
+      color: "#2b4c59",
+      weight: 3,
+      opacity: 0.8,
+      dashArray: "4, 6"
+    }).addTo(graphRoadGroup);
+    polyline.bindTooltip(`🛣️ Road: ${from} ↔ ${to}`, { sticky: true });
+  });
+
+  Object.entries(roadJunctions).forEach(([name, coord]) => {
+    const icon = L.divIcon({
+      className: "custom-div-icon",
+      html: `<div class="graph-junction-pin" title="${name}"></div>`,
+      iconSize: [10, 10],
+      iconAnchor: [5, 5]
+    });
+    const marker = L.marker(coord, { icon }).addTo(graphJunctionGroup);
+    marker.bindTooltip(`⚡ Junction: ${name}`);
+  });
+}
+
+function refreshStationMarkers() {
+  if (!graphMap || !graphStationGroup) return;
+  graphStationGroup.clearLayers();
+  const selectedTypes = selectedStationTypes();
+
+  Object.entries(responseStations).forEach(([name, station]) => {
+    if (!selectedTypes.includes(station.type)) return;
+    const isHospital = station.type === "Hospital";
+    const iconClass = isHospital ? "hospital" : "police";
+    const iconSymbol = isHospital ? "🏥" : "🚓";
+    const displayName = name.replace(" Police Station", " Police").replace(" Police", "").replace(" Hospital", "");
+    const icon = L.divIcon({
+      className: "custom-div-icon",
+      html: `<div class="graph-station-pin ${iconClass}" data-station="${name}">
+               <span class="pin-icon">${iconSymbol}</span>
+               <span>${displayName}</span>
+             </div>`,
+      iconSize: null,
+      iconAnchor: [20, 12]
+    });
+    const marker = L.marker([station.lat, station.lng], { icon }).addTo(graphStationGroup);
+    marker.bindTooltip(`<strong>${name}</strong><br><span style="color:${isHospital ? '#e57373' : '#4fc3f7'}">${station.type}</span>`);
+    marker.bindPopup(`
+      <div style="font-family:'Space Grotesk',sans-serif;min-width:180px;">
+        <h4 style="margin:0 0 4px;font-size:13px;color:#1864ab;">${iconSymbol} ${name}</h4>
+        <div style="font-size:11px;color:#495057;">Eligible Type: <strong>${station.type}</strong></div>
+        <div style="font-size:10px;color:#868e96;margin-top:4px;">GPS: ${station.lat.toFixed(4)}, ${station.lng.toFixed(4)}</div>
+      </div>
+    `);
+  });
+}
+
+function selectEmergencyLocation(name) {
+  const coord = emergencyLocations[name];
+  if (!coord) return;
+  const select = document.querySelector("#graph-place");
+  if (select && select.value !== name) select.value = name;
+  refreshEmergencyMarkers();
+  if (graphMap) graphMap.flyTo(coord, 12, { duration: 0.8 });
+  const summary = document.querySelector("#route-summary");
+  if (summary) {
+    summary.innerHTML = `<strong>Selected ${name}</strong><span class="route-stat">Click 'Find nearest response station' to run Dijkstra shortest path.</span>`;
+  }
+}
+
+function refreshEmergencyMarkers() {
+  if (!graphMap || !graphEmergencyGroup) return;
+  graphEmergencyGroup.clearLayers();
+  const selectedPlace = document.querySelector("#graph-place") ? document.querySelector("#graph-place").value : "Chandni Chowk";
+
+  Object.entries(emergencyLocations).forEach(([name, coord]) => {
+    const isSelected = name === selectedPlace;
+    const icon = L.divIcon({
+      className: "custom-div-icon",
+      html: `<div class="graph-emergency-pin ${isSelected ? "active-source" : ""}">
+               ${isSelected ? '<span class="pulse-ring"></span>' : ''}
+               <span>📍 ${name}</span>
+             </div>`,
+      iconSize: null,
+      iconAnchor: [24, 12]
+    });
+    const marker = L.marker(coord, { icon }).addTo(graphEmergencyGroup);
+    marker.bindTooltip(`Emergency Node: ${name}`);
+    marker.on("click", () => {
+      selectEmergencyLocation(name);
+    });
+  });
+}
+
+function animateVehicleAlongPath(coords, stationType) {
+  if (!graphMap || coords.length < 2) return;
+  if (graphVehicleMarker) {
+    graphVehicleMarker.remove();
+    graphVehicleMarker = null;
+  }
+  const vehicleEmoji = stationType === "Hospital" ? "🚑" : "🚓";
+  const icon = L.divIcon({
+    className: "custom-div-icon",
+    html: `<div class="moving-vehicle-icon">${vehicleEmoji}</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+
+  const marker = L.marker(coords[0], { icon, zIndexOffset: 2500 }).addTo(graphRouteGroup);
+  graphVehicleMarker = marker;
+
+  let currentSegment = 0;
+  let progress = 0;
+  const stepSize = 0.035;
+
+  function move() {
+    if (!graphVehicleMarker || currentSegment >= coords.length - 1) return;
+    progress += stepSize;
+    if (progress >= 1) {
+      progress = 0;
+      currentSegment++;
+      if (currentSegment >= coords.length - 1) {
+        marker.setLatLng(coords[coords.length - 1]);
+        return;
+      }
+    }
+    const p1 = coords[currentSegment];
+    const p2 = coords[currentSegment + 1];
+    const lat = p1[0] + (p2[0] - p1[0]) * progress;
+    const lng = p1[1] + (p2[1] - p1[1]) * progress;
+    marker.setLatLng([lat, lng]);
+    requestAnimationFrame(move);
+  }
+  requestAnimationFrame(move);
+}
+
 function renderDistanceNetwork(location, path = []) {
   const target = document.querySelector("#distance-network");
   if (!target || !location) return;
@@ -142,83 +314,106 @@ function renderDistanceNetwork(location, path = []) {
   const source = `<g class="emergency-node" transform="translate(${sourcePosition.x} ${sourcePosition.y})"><circle r="3.5"></circle></g>`;
   target.innerHTML = `<svg viewBox="0 0 100 100" role="img" aria-label="Illustrative weighted road graph with Dijkstra route">${lines}${markers}${source}</svg>`;
 }
+
 async function runEmergencyTraversal(location) {
   const summary = document.querySelector("#route-summary");
   const steps = document.querySelector("#graph-steps");
   const selectedTypes = selectedStationTypes();
   const runId = ++graphRunId;
+
   if (!selectedTypes.length) {
     summary.innerHTML = "<strong>Select at least one checkpoint type.</strong><span class=\"route-stat\">Choose Police stations or Hospitals before starting traversal.</span>";
     return;
   }
   summary.textContent = "Asking the C++ backend to search the road network…";
+
   try {
     const type = selectedTypes.length === 2 ? "all" : selectedTypes[0];
     const query = new URLSearchParams({ location, type });
     const result = await window.kindredApi(`/api/route?${query}`);
     if (runId !== graphRunId) return;
 
-    if (window.kindredGraphMap) {
-      const [lat, lng] = emergencyLocations[location];
-      if (window.kindredGraphEmergencyMarker) window.kindredGraphEmergencyMarker.setMap(null);
-      window.kindredGraphEmergencyMarker = new google.maps.Marker({ position: { lat, lng }, map: window.kindredGraphMap, title: `Emergency: ${location}`, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#e87862", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } });
-      window.kindredGraphMap.panTo({ lat, lng });
-      if (window.kindredGraphRoute) window.kindredGraphRoute.setMap(null);
-      window.kindredGraphRoute = new google.maps.Polyline({
-        path: result.path.map((name) => {
-          const [routeLat, routeLng] = coordinatesFor(name);
-          return { lat: routeLat, lng: routeLng };
-        }),
-        map: window.kindredGraphMap,
-        strokeColor: "#1769ff",
-        strokeOpacity: 0.9,
-        strokeWeight: 5
-      });
-    } else {
-      renderGraphGps([], location);
+    if (graphMap) {
+      selectEmergencyLocation(location);
+      if (graphRouteGroup) graphRouteGroup.clearLayers();
     }
 
     renderDistanceNetwork(location, result.path);
     steps.innerHTML = result.settled.map((item, index) => `<div class="graph-step" data-step="${index}"><span>${index + 1}</span>Settled ${item.name}<small>${item.distance.toFixed(1)} km estimated from ${location}</small></div>`).join("");
     summary.textContent = "C++ Dijkstra is comparing the lowest known distance at each connected place…";
+
     result.settled.forEach((item, index) => setTimeout(() => {
       if (runId !== graphRunId) return;
       const step = document.querySelector(`[data-step="${index}"]`);
       if (step) step.classList.add("visited");
+
+      const itemCoord = coordinatesFor(item.name);
+      if (graphMap && itemCoord && graphRouteGroup) {
+        const isTarget = index === result.settled.length - 1;
+        const pulseCircle = L.circleMarker(itemCoord, {
+          radius: isTarget ? 14 : 9,
+          color: isTarget ? "#ffd54f" : "#4dabf7",
+          weight: 2,
+          fillColor: isTarget ? "#ffd54f" : "#74c0fc",
+          fillOpacity: 0.6
+        }).addTo(graphRouteGroup);
+        if (!isTarget) {
+          setTimeout(() => { pulseCircle.remove(); }, 1400);
+        }
+      }
+
       if (index === result.settled.length - 1) {
         if (step) step.classList.add("selected");
-        summary.innerHTML = `<strong>Request sent to nearest eligible station</strong><span class="route-stat">${result.path.join(" → ")}</span><span class="route-stat">${result.stationType} · ${result.distance.toFixed(1)} km estimated graph distance</span>`;
+        summary.innerHTML = `<strong>Request sent to nearest eligible station</strong><span class="route-stat">${result.path.join(" → ")}</span><span class="route-stat">${result.stationType}: <strong>${result.station}</strong> · ${result.distance.toFixed(1)} km estimated graph distance</span>`;
+
+        if (graphMap && graphRouteGroup) {
+          const pathCoords = result.path.map((name) => coordinatesFor(name)).filter(Boolean);
+          if (pathCoords.length >= 2) {
+            L.polyline(pathCoords, {
+              color: "#e87862",
+              weight: 6,
+              opacity: 0.95,
+              lineCap: "round",
+              lineJoin: "round"
+            }).addTo(graphRouteGroup);
+
+            L.polyline(pathCoords, {
+              color: "#ffffff",
+              weight: 2,
+              opacity: 0.85,
+              dashArray: "6, 12",
+              className: "animated-route-flow"
+            }).addTo(graphRouteGroup);
+
+            document.querySelectorAll(".graph-station-pin").forEach(p => p.classList.remove("selected-station"));
+            const destPin = document.querySelector(`[data-station="${result.station}"]`);
+            if (destPin) destPin.classList.add("selected-station");
+
+            animateVehicleAlongPath(pathCoords.slice().reverse(), result.stationType);
+
+            const destCoord = coordinatesFor(result.station);
+            if (destCoord) {
+              L.popup({ className: "graph-popup" })
+                .setLatLng(destCoord)
+                .setContent(`
+                  <h4>🎯 Shortest Path Settled</h4>
+                  <p><strong>${result.station}</strong></p>
+                  <p>Distance: <strong>${result.distance.toFixed(1)} km</strong> (${result.path.length - 1} road segments)</p>
+                  <span class="popup-tag ${result.stationType === 'Hospital' ? 'hospital' : 'police'}">${result.stationType} Dispatched</span>
+                `)
+                .openOn(graphMap);
+            }
+
+            graphMap.flyToBounds(L.latLngBounds(pathCoords).pad(0.35), { duration: 1.2 });
+          }
+        }
       }
-    }, index * 600));
+    }, index * 450));
   } catch (error) {
     if (runId === graphRunId) summary.textContent = `C++ route request failed: ${error.message}`;
   }
 }
-function setupGoogleGraphMap() {
-  const target = document.querySelector("#graph-map");
-  if (!target || !window.KINDRED_GOOGLE_MAPS_KEY || window.KINDRED_GOOGLE_MAPS_KEY.includes("PASTE_")) return;
-  window.kindredGraphMapReady = () => {
-    const map = new google.maps.Map(target, { center: { lat: 28.6139, lng: 77.209 }, zoom: 11, mapTypeId: "satellite", mapTypeControl: false, streetViewControl: false, fullscreenControl: true });
-    window.kindredGraphMap = map;
-    window.kindredGraphMarkers = [];
-    refreshGoogleGraphMarkers();
-    window.kindredGraphMap = map;
-  };
-  const script = document.createElement("script");
-  script.onerror = () => {
-    const summary = document.querySelector("#route-summary");
-    if (summary) summary.innerHTML = "<strong>Google Maps could not load.</strong><span class=\"route-stat\">Check the key, billing, Maps JavaScript API, and localhost restriction.</span>";
-  };
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(window.KINDRED_GOOGLE_MAPS_KEY)}&callback=kindredGraphMapReady`;
-  script.async = true; script.defer = true; document.head.appendChild(script);
-}
-function refreshGoogleGraphMarkers() {
-  if (!window.kindredGraphMap) return;
-  (window.kindredGraphMarkers || []).forEach((marker) => marker.setMap(null));
-  window.kindredGraphMarkers = visibleResponseStations().map(([name, station]) => new google.maps.Marker({
-    position: { lat: station.lat, lng: station.lng }, map: window.kindredGraphMap, title: `${name} · ${station.type}`
-  }));
-}
+
 function renderLinked(items) {
   document.querySelector("#output").innerHTML = `<div class="array-cells">${items.map((item, i) => `<span class="cell ${i === 0 ? "active" : ""}">${item}${i < items.length - 1 ? " →" : " → null"}</span>`).join("")}</div><div class="log">head → node → node → tail · insert and remove update pointers</div>`;
 }
@@ -269,11 +464,9 @@ function renderTree(type, severity, response, priority) {
   document.querySelector("#output").innerHTML = `<div class="decision-tree"><span class="tree-node">Emergency</span><i>→</i><span class="tree-node">${type.replace(" emergency", "")}</span><i>→</i><span class="tree-node">${severity}</span><i>→</i><span class="tree-node active">${priority}<small>${response}</small></span></div><div class="steps tree-steps"><span class="step">1 · Read emergency type</span><span class="step">2 · Compare severity</span><span class="step">3 · Reach response leaf</span></div><div class="log">root → type branch → severity branch → response leaf</div>`;
 }
 function renderRoute(stops, activeIndex = -1) {
-  renderGraphGps(stops);
-  const stopBox = document.querySelector("#route-stops");
-  if (stopBox) stopBox.innerHTML = stops.length ? stops.map((stop, index) => `<span class="route-stop ${index === activeIndex ? "active" : ""}">${index + 1}. ${stop}<button data-index="${index}" aria-label="Remove ${stop}">×</button></span>`).join("") : `<span class="route-empty">Add at least two Delhi places to create a route.</span>`;
+  if (page === "graph") setupLeafletGraphMap();
   const summary = document.querySelector("#route-summary");
-  if (summary && stops.length < 2) summary.textContent = "Add at least two places, then find the real route.";
+  if (summary) summary.innerHTML = "<strong>Select an emergency node on the map</strong> or choose from the dropdown, then click <em>Find nearest response station</em>.";
 }
 function setupControls() {
   if (page === "array") {
@@ -315,12 +508,17 @@ function setupControls() {
   if (page === "graph") {
     document.querySelector("#graph-run").addEventListener("click", () => runEmergencyTraversal(document.querySelector("#graph-place").value));
     document.querySelectorAll(".station-filter").forEach((input) => input.addEventListener("change", () => {
-      if (window.kindredGraphMap) refreshGoogleGraphMarkers();
-      else renderGraphGps([]);
+      refreshStationMarkers();
     }));
+    const placeSelect = document.querySelector("#graph-place");
+    if (placeSelect) {
+      placeSelect.addEventListener("change", () => {
+        selectEmergencyLocation(placeSelect.value);
+      });
+    }
   }
 }
 renderBase();
-if (page === "graph") setupGoogleGraphMap();
+if (page === "graph") setupLeafletGraphMap();
 setupControls();
 if (page === "queue") refreshQueue();

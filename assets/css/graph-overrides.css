@@ -1,0 +1,1104 @@
+.maze-board {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  height: 290px;
+  padding: 14px;
+  background: #1a2934;
+  border-radius: 8px
+}
+
+.maze-cell {
+  border: 1px solid #2e4654;
+  border-radius: 3px;
+  background: #223744;
+  transition: background .22s, transform .22s, box-shadow .22s
+}
+
+.maze-cell.explored {
+  background: #567d75;
+  box-shadow: 0 0 7px #75a37d;
+  transform: scale(.92)
+}
+
+.maze-cell.shortest {
+  background: #e87862;
+  box-shadow: 0 0 10px #e87862;
+  transform: scale(1.05)
+}
+
+.maze-cell.start {
+  background: #75a37d;
+  border-color: #cbe3cb
+}
+
+.maze-cell.goal {
+  background: #f0c16e;
+  border-color: #ffe8a8
+}
+
+.maze-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 0 2px;
+  color: #7a8a93;
+  font: 9px monospace
+}
+
+.maze-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+  background: #567d75
+}
+
+.start-dot {
+  background: #75a37d
+}
+
+.path-dot {
+  background: #e87862
+}
+
+.goal-dot {
+  background: #f0c16e
+}
+
+.route-summary {
+  margin-top: 13px;
+  padding: 11px;
+  background: #eef5f1;
+  color: #587263;
+  border-radius: 6px;
+  font: 10px monospace
+}
+
+.route-summary strong {
+  color: #3f7058
+}
+
+.term-list {
+  margin: 0
+}
+
+.term-list dt {
+  font: 600 10px monospace;
+  color: #e87862;
+  margin-top: 12px
+}
+
+.term-list dd {
+  margin: 3px 0 0;
+  color: #60727d;
+  font-size: 10px;
+  line-height: 1.45
+}
+
+.array-meter {
+  height: 8px;
+  background: #e6edf0;
+  border-radius: 8px;
+  margin: 22px 0 5px;
+  overflow: hidden
+}
+
+.array-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #75a37d, #e87862);
+  border-radius: 8px;
+  transition: width .5s
+}
+
+.cell em {
+  font: 9px "DM Sans";
+  color: #8999a2;
+  margin-left: 2px
+}
+
+.tree-steps .step {
+  opacity: .45
+}
+
+.tree-steps .step.active {
+  opacity: 1
+}
+
+@media(max-width:800px) {
+  .maze-board {
+    height: 230px
+  }
+
+  .maze-legend {
+    gap: 8px
+  }
+}
+
+.graph-map {
+  height: 260px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #dce9e6;
+  border: 1px solid #c3d5d1;
+  margin-bottom: 18px
+}
+
+.graph-gps-grid {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(28deg, transparent 48%, #c2d6d1 49%, transparent 50%), linear-gradient(120deg, transparent 48%, #c2d6d1 49%, transparent 50%), repeating-linear-gradient(90deg, transparent 0 42px, rgba(255, 255, 255, .35) 43px 44px), repeating-linear-gradient(0deg, transparent 0 34px, rgba(255, 255, 255, .35) 35px 36px)
+}
+
+.graph-map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%
+}
+
+.graph-gps-road {
+  fill: none;
+  stroke: #9bb7b1;
+  stroke-width: 1.6;
+  stroke-linecap: round
+}
+
+.graph-gps-road.faint {
+  stroke: #b2c9c4;
+  stroke-width: 1
+}
+
+.graph-gps-route {
+  fill: none;
+  stroke: #e87862;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px #718c87)
+}
+
+.graph-gps-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2
+}
+
+.graph-gps-marker i {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff;
+  background: #356b91;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px #627b7b
+}
+
+.graph-gps-marker.selected i {
+  background: #e87862;
+  box-shadow: 0 0 0 5px #e8786244
+}
+
+.graph-gps-marker b {
+  position: absolute;
+  left: 8px;
+  top: -7px;
+  white-space: nowrap;
+  font: 8px monospace;
+  color: #2d4d55;
+  background: #eff7f4dd;
+  padding: 3px 4px;
+  border-radius: 3px
+}
+
+.graph-gps-label,
+.graph-gps-status {
+  position: absolute;
+  z-index: 3;
+  font: 8px monospace;
+  color: #356b91;
+  background: #f1f8f5dd;
+  padding: 5px 7px;
+  border-radius: 3px
+}
+
+.graph-gps-label {
+  left: 10px;
+  top: 10px
+}
+
+.graph-gps-status {
+  right: 10px;
+  bottom: 10px;
+  color: #a44d3b
+}
+
+.maze-heading {
+  margin-top: 22px !important
+}
+
+@media(max-width:800px) {
+  .graph-map {
+    height: 220px
+  }
+
+  .graph-gps-marker b {
+    font-size: 7px
+  }
+}
+
+.graph-card {
+  max-width: none
+}
+
+.graph-map {
+  height: 390px;
+  margin: 10px 0 20px;
+  background: #142229
+}
+
+.graph-map:has(.gm-style) {
+  background: #111
+}
+
+.graph-gps-grid {
+  background: linear-gradient(28deg, transparent 48%, #31504d 49%, transparent 50%), linear-gradient(120deg, transparent 48%, #284744 49%, transparent 50%), repeating-linear-gradient(90deg, transparent 0 42px, rgba(117, 163, 125, .12) 43px 44px), repeating-linear-gradient(0deg, transparent 0 34px, rgba(117, 163, 125, .12) 35px 36px)
+}
+
+.graph-gps-road {
+  stroke: #547c72
+}
+
+.graph-gps-road.faint {
+  stroke: #35574f
+}
+
+.graph-gps-label,
+.graph-gps-status {
+  background: #10231fdd;
+  color: #b8dcc4
+}
+
+.station-marker i {
+  background: #3d9bce
+}
+
+.emergency-marker i {
+  background: #e87862;
+  box-shadow: 0 0 0 6px #e8786255
+}
+
+.route-summary {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  padding: 16px;
+  background: #edf3ff;
+  border: 1px solid #c8d8ff;
+  color: #31517d;
+  font: 11px "DM Sans";
+  line-height: 1.5
+}
+
+.route-summary strong {
+  color: #1769ff;
+  font: 600 13px "Space Grotesk"
+}
+
+.route-stat {
+  display: block;
+  color: #40566d
+}
+
+.route-button {
+  margin-top: 4px
+}
+
+.graph-steps {
+  display: grid;
+  gap: 7px;
+  margin-top: 15px
+}
+
+.graph-step {
+  display: grid;
+  grid-template-columns: 25px 1fr;
+  gap: 4px 8px;
+  padding: 9px 11px;
+  background: #eef3f5;
+  border-radius: 6px;
+  color: #71818c;
+  font: 10px monospace;
+  transition: .3s
+}
+
+.graph-step span {
+  grid-row: span 2;
+  color: #e87862
+}
+
+.graph-step small {
+  grid-column: 2;
+  color: #91a0a8;
+  font: 9px monospace
+}
+
+.graph-step.visited {
+  background: #e5f0f3;
+  color: #315b70
+}
+
+.graph-step.selected {
+  background: #ffe0d7;
+  color: #a44d3b;
+  box-shadow: inset 3px 0 #e87862
+}
+
+.stack-explainer {
+  margin-bottom: 24px
+}
+
+.stack-explainer p {
+  max-width: 560px
+}
+
+.stack-card .control-row {
+  flex-wrap: wrap;
+  align-items: center
+}
+
+.stack-card .action {
+  min-height: 36px
+}
+
+.stack-cells {
+  gap: 9px;
+  padding: 8px 0
+}
+
+.stack-cells .cell {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+
+.stack-cells .cell.active {
+  box-shadow: 0 0 0 2px #e87862
+}
+
+.stack-cells .cell small {
+  position: static;
+  margin-right: 8px
+}
+
+.info-card p {
+  margin: 0 0 12px
+}
+
+@media(max-width:800px) {
+  .graph-map {
+    height: 300px
+  }
+
+  .stack-card .control-row .input {
+    min-width: 100%
+  }
+}
+
+.distance-lab {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #dce4e9
+}
+
+.distance-lab h2 {
+  font: 600 21px "Space Grotesk";
+  margin: 8px 0 5px
+}
+
+.distance-lab p {
+  max-width: 620px;
+  color: #75808b;
+  font-size: 11px;
+  line-height: 1.55
+}
+
+.distance-network {
+  height: 370px;
+  margin-top: 16px;
+  background: #142229;
+  border-radius: 8px;
+  overflow: hidden
+}
+
+.distance-network svg {
+  width: 100%;
+  height: 100%;
+  display: block
+}
+
+.distance-edge {
+  stroke: #5a7b83;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 2;
+  opacity: .7;
+  animation: draw-edge .7s var(--edge-delay) both
+}
+
+.shortest-edge {
+  stroke: #1769ff;
+  stroke-width: 2.8;
+  stroke-dasharray: 0;
+  opacity: .12;
+  filter: drop-shadow(0 0 4px #1769ff);
+  transition: opacity .5s
+}
+
+.shortest-edge.route-revealed {
+  opacity: 1
+}
+
+.distance-label {
+  fill: #b4c6ca;
+  font: 3px monospace;
+  text-anchor: middle
+}
+
+.distance-node circle {
+  fill: #356b91;
+  stroke: #e4f2f4;
+  stroke-width: 1
+}
+
+.distance-node text,
+.emergency-node text {
+  fill: #dcebef;
+  font: 3px "DM Sans";
+  text-anchor: middle
+}
+
+.shortest-node circle {
+  fill: #1769ff;
+  r: 9
+}
+
+.emergency-node circle {
+  fill: #e87862;
+  stroke: #fff;
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 5px #e87862)
+}
+
+.emergency-node text {
+  fill: #ffd4ca;
+  font-weight: 600
+}
+
+.distance-legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 9px;
+  color: #75808b;
+  font: 9px monospace
+}
+
+.legend-line {
+  display: inline-block;
+  width: 20px;
+  border-top: 2px dashed #5a7b83;
+  margin: 0 6px 3px 0
+}
+
+.legend-line.shortest {
+  border-color: #1769ff;
+  border-top-style: solid
+}
+
+@keyframes draw-edge {
+  from {
+    stroke-dashoffset: 30;
+    opacity: 0
+  }
+
+  to {
+    stroke-dashoffset: 0;
+    opacity: .7
+  }
+}
+
+.graph-map:has(.gm-style) {
+  background: #111
+}
+
+.graph-gps-grid {
+  background: linear-gradient(28deg, transparent 48%, #31504d 49%, transparent 50%), linear-gradient(120deg, transparent 48%, #284744 49%, transparent 50%), repeating-linear-gradient(90deg, transparent 0 42px, rgba(117, 163, 125, .12) 43px 44px), repeating-linear-gradient(0deg, transparent 0 34px, rgba(117, 163, 125, .12) 35px 36px)
+}
+
+.graph-gps-road {
+  stroke: #547c72
+}
+
+.graph-gps-road.faint {
+  stroke: #35574f
+}
+
+.graph-gps-label,
+.graph-gps-status {
+  background: #10231fdd;
+  color: #b8dcc4
+}
+
+.station-marker i {
+  background: #3d9bce
+}
+
+.emergency-marker i {
+  background: #e87862;
+  box-shadow: 0 0 0 6px #e8786255
+}
+
+.route-summary {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  padding: 16px;
+  background: #edf3ff;
+  border: 1px solid #c8d8ff;
+  color: #31517d;
+  font: 11px "DM Sans";
+  line-height: 1.5
+}
+
+.route-summary strong {
+  color: #1769ff;
+  font: 600 13px "Space Grotesk"
+}
+
+.route-stat {
+  display: block;
+  color: #40566d
+}
+
+.route-button {
+  margin-top: 4px
+}
+
+.graph-steps {
+  display: grid;
+  gap: 7px;
+  margin-top: 15px
+}
+
+.graph-step {
+  display: grid;
+  grid-template-columns: 25px 1fr;
+  gap: 4px 8px;
+  padding: 9px 11px;
+  background: #eef3f5;
+  border-radius: 6px;
+  color: #71818c;
+  font: 10px monospace;
+  transition: .3s
+}
+
+.graph-step span {
+  grid-row: span 2;
+  color: #e87862
+}
+
+.graph-step small {
+  grid-column: 2;
+  color: #91a0a8;
+  font: 9px monospace
+}
+
+.graph-step.visited {
+  background: #e5f0f3;
+  color: #315b70
+}
+
+.graph-step.selected {
+  background: #ffe0d7;
+  color: #a44d3b;
+  box-shadow: inset 3px 0 #e87862
+}
+
+.stack-explainer {
+  margin-bottom: 24px
+}
+
+.stack-explainer p {
+  max-width: 560px
+}
+
+.stack-card .control-row {
+  flex-wrap: wrap;
+  align-items: center
+}
+
+.stack-card .action {
+  min-height: 36px
+}
+
+.stack-cells {
+  gap: 9px;
+  padding: 8px 0
+}
+
+.stack-cells .cell {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+
+.stack-cells .cell.active {
+  box-shadow: 0 0 0 2px #e87862
+}
+
+.stack-cells .cell small {
+  position: static;
+  margin-right: 8px
+}
+
+.info-card p {
+  margin: 0 0 12px
+}
+
+@media(max-width:800px) {
+  .graph-map {
+    height: 300px
+  }
+
+  .stack-card .control-row .input {
+    min-width: 100%
+  }
+}
+
+.checkpoint-filters {
+  display: grid;
+  grid-template-columns: 150px repeat(2, minmax(130px, 1fr));
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  background: #f4f7f8;
+  border: 1px solid #dce4e9;
+  border-radius: 7px
+}
+
+.filter-heading {
+  font: 600 9px monospace;
+  letter-spacing: .7px;
+  color: #7a8a93
+}
+
+.checkpoint-filters label {
+  font: 11px "DM Sans";
+  color: #40566d
+}
+
+.checkpoint-filters input {
+  accent-color: #e87862;
+  margin-right: 6px
+}
+
+@media(max-width:800px) {
+  .checkpoint-filters {
+    grid-template-columns: 1fr 1fr
+  }
+
+  .filter-heading {
+    grid-column: 1/-1
+  }
+}
+
+.graph-map:has(.gm-style) {
+  background: #111
+}
+
+.graph-gps-grid {
+  background: linear-gradient(28deg, transparent 48%, #31504d 49%, transparent 50%), linear-gradient(120deg, transparent 48%, #284744 49%, transparent 50%), repeating-linear-gradient(90deg, transparent 0 42px, rgba(117, 163, 125, .12) 43px 44px), repeating-linear-gradient(0deg, transparent 0 34px, rgba(117, 163, 125, .12) 35px 36px)
+}
+
+.graph-gps-road {
+  stroke: #547c72
+}
+
+.graph-gps-road.faint {
+  stroke: #35574f
+}
+
+.graph-gps-label,
+.graph-gps-status {
+  background: #10231fdd;
+  color: #b8dcc4
+}
+
+.station-marker i {
+  background: #3d9bce
+}
+
+.emergency-marker i {
+  background: #e87862;
+  box-shadow: 0 0 0 6px #e8786255
+}
+
+.route-summary {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  padding: 16px;
+  background: #edf3ff;
+  border: 1px solid #c8d8ff;
+  color: #31517d;
+  font: 11px "DM Sans";
+  line-height: 1.5
+}
+
+.route-summary strong {
+  color: #1769ff;
+  font: 600 13px "Space Grotesk"
+}
+
+.route-stat {
+  display: block;
+  color: #40566d
+}
+
+.route-button {
+  margin-top: 4px
+}
+
+.graph-steps {
+  display: grid;
+  gap: 7px;
+  margin-top: 15px
+}
+
+.graph-step {
+  display: grid;
+  grid-template-columns: 25px 1fr;
+  gap: 4px 8px;
+  padding: 9px 11px;
+  background: #eef3f5;
+  border-radius: 6px;
+  color: #71818c;
+  font: 10px monospace;
+  transition: .3s
+}
+
+.graph-step span {
+  grid-row: span 2;
+  color: #e87862
+}
+
+.graph-step small {
+  grid-column: 2;
+  color: #91a0a8;
+  font: 9px monospace
+}
+
+.graph-step.visited {
+  background: #e5f0f3;
+  color: #315b70
+}
+
+.graph-step.selected {
+  background: #ffe0d7;
+  color: #a44d3b;
+  box-shadow: inset 3px 0 #e87862
+}
+
+.stack-explainer {
+  margin-bottom: 24px
+}
+
+.stack-explainer p {
+  max-width: 560px
+}
+
+.stack-card .control-row {
+  flex-wrap: wrap;
+  align-items: center
+}
+
+.stack-card .action {
+  min-height: 36px
+}
+
+.stack-cells {
+  gap: 9px;
+  padding: 8px 0
+}
+
+.stack-cells .cell {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+
+.stack-cells .cell.active {
+  box-shadow: 0 0 0 2px #e87862
+}
+
+.stack-cells .cell small {
+  position: static;
+  margin-right: 8px
+}
+
+.info-card p {
+  margin: 0 0 12px
+}
+
+@media(max-width:800px) {
+  .graph-map {
+    height: 300px
+  }
+
+  .stack-card .control-row .input {
+    min-width: 100%
+  }
+}
+
+.distance-node.station-node circle {
+  fill: #3d9bce
+}
+
+.distance-node.junction-node circle {
+  fill: #75a37d
+}
+
+.distance-node.shortest-node circle {
+  r: 3;
+  fill: #1769ff
+}
+
+.distance-node text {
+  font-size: 2.2px
+}
+
+.distance-node.shortest-node text {
+  fill: #fff;
+  font-weight: 600
+}
+
+.graph-gps-road {
+  stroke-width: .7;
+  opacity: .8
+}
+
+/* Leaflet Graph Lab Enhancements */
+#graph-map {
+  z-index: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #2e4654;
+  background: #f8f9fa;
+}
+
+.custom-div-icon,
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.graph-station-pin {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(18, 32, 40, 0.92);
+  border: 1.5px solid #3d9bce;
+  border-radius: 20px;
+  padding: 3px 8px 3px 6px;
+  color: #e6f4f8;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.graph-station-pin:hover {
+  transform: scale(1.1);
+  border-color: #64b5f6;
+  box-shadow: 0 6px 16px rgba(61, 155, 206, 0.5);
+}
+
+.graph-station-pin.hospital {
+  border-color: #e57373;
+}
+
+.graph-station-pin.police {
+  border-color: #4fc3f7;
+}
+
+.graph-station-pin.selected-station {
+  border-color: #ffd54f !important;
+  background: rgba(30, 45, 60, 0.98);
+  box-shadow: 0 0 16px #ffd54f, 0 0 0 3px rgba(255, 213, 79, 0.3);
+  transform: scale(1.15);
+  z-index: 1000 !important;
+}
+
+.graph-station-pin .pin-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.graph-emergency-pin {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(232, 120, 98, 0.95);
+  border: 2px solid #ffffff;
+  border-radius: 16px;
+  padding: 3px 9px;
+  color: #fff;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 3px 12px rgba(232, 120, 98, 0.6);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.graph-emergency-pin.active-source {
+  background: #ff471a;
+  box-shadow: 0 0 0 6px rgba(255, 71, 26, 0.35), 0 6px 20px rgba(0, 0, 0, 0.6);
+  transform: scale(1.12);
+}
+
+.graph-emergency-pin .pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(2.6);
+    opacity: 0;
+  }
+}
+
+.graph-junction-pin {
+  width: 10px;
+  height: 10px;
+  background: #75a37d;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.graph-junction-pin:hover {
+  transform: scale(1.4);
+}
+
+.animated-route-flow {
+  animation: flowRoute 1.2s linear infinite;
+}
+
+@keyframes flowRoute {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.exploration-pulse {
+  animation: exploreGlow 0.8s ease-out forwards;
+}
+
+@keyframes exploreGlow {
+  0% {
+    r: 6;
+    stroke-width: 4;
+    stroke-opacity: 1;
+  }
+
+  100% {
+    r: 28;
+    stroke-width: 1;
+    stroke-opacity: 0;
+  }
+}
+
+.moving-vehicle-icon {
+  font-size: 20px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.7));
+  transition: all 0.15s ease-out;
+}
+
+.graph-popup .leaflet-popup-content-wrapper {
+  background: #142229;
+  color: #e4edf1;
+  border: 1px solid #3d5a69;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+}
+
+.graph-popup .leaflet-popup-tip {
+  background: #142229;
+  border: 1px solid #3d5a69;
+}
+
+.graph-popup h4 {
+  margin: 0 0 6px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffd54f;
+}
+
+.graph-popup p {
+  margin: 3px 0;
+  color: #b5c7cf;
+}
+
+.graph-popup strong {
+  color: #ffffff;
+}
+
+.graph-popup .popup-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+.graph-popup .popup-tag.hospital {
+  background: #2b8a3e;
+  color: #fff;
+}
+
+.graph-popup .popup-tag.police {
+  background: #1971c2;
+  color: #fff;
+}

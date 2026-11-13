@@ -122,21 +122,24 @@ Sample data is held in memory and resets when the server restarts.
 
 ## Map and location
 
-The dashboard map uses **Leaflet** with **OpenStreetMap** street tiles. It requires internet access to load the library and tiles, displays OpenStreetMap attribution, and needs no Google Maps API key. Selecting a station previews a straight line from Connaught Place; browser geolocation is requested only after pressing **Use my live location**. If the device is more than 25 km from Delhi, the page reports its coordinates and distance while keeping the map centered on Delhi.
+## Map and location
 
-The Graph lab’s optional satellite layer is separate from the dashboard map and uses the Google Maps JavaScript API. To enable it, configure the API and billing, restrict a key to `http://localhost:8000/*`, and copy `google-map-config.example.js` to `google-map-config.js` with the key. The Graph lab does not use Google Directions or Routes APIs.
+Both the **Command Centre** and the **Graph Lab** use **Leaflet** with interactive tiles. They require internet access for map tiles and Leaflet assets, display OpenStreetMap attribution, and require **no API keys or billing configuration**.
+
+- **Command Centre map**: Displays active emergencies and response stations across Delhi. Selecting an emergency or table row highlights the incident and calculates straight-line distance to the nearest station. Pressing **Process next** triggers a live dispatch route and vehicle animation. Browser geolocation is requested only after pressing **Use my live location**.
+- **Graph Lab map**: Renders an interactive weighted road network with hospitals, police stations, junctions, and emergency nodes. Users can click any emergency node or station on the map, filter checkpoint types, and run Dijkstra's algorithm to watch step-by-step vertex exploration, shortest-path calculation, and vehicle dispatch animation.
 
 ## Project structure
 
 | Path | Purpose |
 | --- | --- |
 | `backend/main.cpp` | C++ server, sample data, heap, and graph algorithms |
-| `index.html`, `app.js`, `api.js` | Dashboard and backend requests |
-| `array.html`, `linked-list.html`, `stack.html` | Browser-side DSA demonstrations |
-| `queue.html`, `tree.html`, `graph.html` | Queue, triage, and graph labs |
-| `dsa-pages.js` | DSA page behavior and visualizations |
+| `assets/css/` | Dashboard and DSA lab stylesheets |
+| `assets/js/` | Dashboard behavior, API client, and DSA lab visualizations |
+| `index.html` and the other root-level `*.html` pages | Command centre and DSA lab entry points |
 | `start-localhost.ps1` | Windows build-and-run script |
 | `docs/images/` | README screenshots |
+| `report/` | Project reports |
 
 ## Scope and limitations
 

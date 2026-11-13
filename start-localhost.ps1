@@ -6,6 +6,7 @@ if (-not $compiler) {
 }
 
 $server = Join-Path $PSScriptRoot "backend\kindred-server.exe"
+Get-Process -Name kindred-server -ErrorAction SilentlyContinue | Stop-Process -Force
 & $compiler.Source -std=c++17 -O2 -static (Join-Path $PSScriptRoot "backend\main.cpp") -lws2_32 -o $server
 if ($LASTEXITCODE -ne 0) {
     throw "The C++ backend did not compile."
